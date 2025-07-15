@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-blue: #3d55f3;
+  --accent-yellow: #fecf33;
+  --deep-purple: #7a5af8;
+  --bright-orange: #f68b2c;
+  --soft-red: #ea4e3d;
+  --light-grey: #f4f4f6;
+  --dark-navy: #0f172a;
+  --medium-grey: #6b7280;
+}
+
+.bg-destructive {
+  background-color: hsl(var(--destructive, 0 84.2% 60.2%));
+}
+
+* {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+    color: rgb(var(--foreground));
+    background: var(--background);
+  }
+
+ 
+.primary-button {
+  background-color: var(--accent-yellow);
+  color: var(--dark-navy);
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.secondary-button {
+  background-color: white;
+  border: 2px solid var(--primary-blue);
+  color: var(--primary-blue);
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.card-shadow {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+div[role="dialog"] {
+  background-color: white;
+}
+
+li[role="dialog"] {
+  background-color: white;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.auth-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
