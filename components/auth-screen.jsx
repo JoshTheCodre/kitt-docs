@@ -71,6 +71,16 @@ export default function AuthScreen() {
         if (error) throw error;
 
         if (data.user) {
+          // Wait for email confirmation in production
+          if (!data.user.email_confirmed_at && data.user.confirmation_sent_at) {
+            toast({
+              title: "Check your email",
+              description: "Please check your email and click the confirmation link to complete registration.",
+            });
+            return;
+          }
+
+          // Create user profile
           const { error: profileError } = await supabase.from("users").insert({
             id: data.user.id,
             email: data.user.email,
@@ -78,16 +88,25 @@ export default function AuthScreen() {
             school,
             department,
             level,
+            role: 'buyer',
+            created_at: new Date().toISOString()
           });
 
-          if (profileError) throw profileError;
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            throw new Error(`Failed to create user profile: ${profileError.message}`);
+          }
 
+          // Create wallet
           const { error: walletError } = await supabase.from("wallets").insert({
             user_id: data.user.id,
-            balance: 0,
+            balance: 0.00,
           });
 
-          if (walletError) throw walletError;
+          if (walletError) {
+            console.error('Wallet creation error:', walletError);
+            throw new Error(`Failed to create wallet: ${walletError.message}`);
+          }
 
           toast({
             title: "Account created!",

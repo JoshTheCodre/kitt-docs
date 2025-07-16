@@ -68,15 +68,46 @@ export default function ProfileScreen({ user, onNavigate }) {
   }
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
+    try {
+      // Clear user state first
+      clearUser();
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Signout error:', error);
+        toast({
+          title: "Error signing out",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        // Clear any localStorage or sessionStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('app-storage');
+          sessionStorage.clear();
+        }
+
+        toast({
+          title: "Signed out successfully",
+          description: "You have been logged out.",
+        });
+
+        // Force page reload to reset all state
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Unexpected signout error:', err);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error signing out",
+        description: "An unexpected error occurred. Please refresh the page.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const getInitials = (name) => {
     return name
