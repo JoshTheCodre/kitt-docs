@@ -249,7 +249,7 @@ ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  -- Insert user profile
+  -- Insert user profile (only if it doesn't exist)
   INSERT INTO public.users (id, email, name, school, department, level, role)
   VALUES (
     NEW.id,
@@ -259,11 +259,13 @@ BEGIN
     '',
     '',
     'buyer'
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
 
-  -- Insert wallet
+  -- Insert wallet (only if it doesn't exist)
   INSERT INTO public.wallets (user_id, balance)
-  VALUES (NEW.id, 0.00);
+  VALUES (NEW.id, 0.00)
+  ON CONFLICT (user_id) DO NOTHING;
 
   RETURN NEW;
 END;

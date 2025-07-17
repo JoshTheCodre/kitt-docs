@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Eye,
   EyeOff,
@@ -127,7 +127,19 @@ export default function AuthScreen() {
                   `Failed to create user profile: ${profileError.message}`,
                 );
               }
-              // Optional: create wallet, as in your code
+
+              // Create wallet for the user
+              const { error: walletError } = await supabase
+                .from("wallets")
+                .insert({
+                  user_id: data.user.id,
+                  balance: 0.00,
+                });
+
+              if (walletError) {
+                console.error("Wallet creation error:", walletError);
+                // Don't throw error here as profile was created successfully
+              }
             }
 
             toast({
@@ -179,9 +191,8 @@ export default function AuthScreen() {
   };
 
   // 3. Check Google session after redirect, and show modal if user is new
-  React.useEffect(() => {
-    // Only run after Google redirect
-    (async () => {
+  useEffect(() => {
+    const checkGoogleUser = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -196,12 +207,13 @@ export default function AuthScreen() {
       // If not found in users table, and we're not already in profile modal
       if (!existingUser && !showGoogleProfile) {
         setGoogleUserId(user.id);
-        setGoogleUserEmail(user.email);
+        setGoogleUserEmail(user.email || "");
         setShowGoogleProfile(true);
       }
-    })();
-    // eslint-disable-next-line
-  }, []);
+    };
+
+    checkGoogleUser();
+  }, [showGoogleProfile]);
 
   // 4. Handle Google Profile Creation (after modal submit)
   const handleGoogleProfile = async (e) => {
@@ -226,6 +238,19 @@ export default function AuthScreen() {
         throw new Error(
           `Failed to create user profile: ${profileError.message}`,
         );
+      }
+
+      // Create wallet for the Google user
+      const { error: walletError } = await supabase
+        .from("wallets")
+        .insert({
+          user_id: googleUserId,
+          balance: 0.00,
+        });
+
+      if (walletError) {
+        console.error("Wallet creation error:", walletError);
+        // Don't throw error here as profile was created successfully
       }
 
       setShowGoogleProfile(false);
