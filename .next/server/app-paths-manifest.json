@@ -1,7 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/home/page": "app/home/page.js",
-  "/explore/page": "app/explore/page.js",
-  "/upload/page": "app/upload/page.js",
-  "/profile/page": "app/profile/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/home/page": "app/home/page.js"
 }

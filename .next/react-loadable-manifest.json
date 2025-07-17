@@ -1,10 +1,4 @@
 {
-  "components/screens/upload-screen.jsx -> pdfjs-dist/legacy/build/pdf": {
-    "id": "components/screens/upload-screen.jsx -> pdfjs-dist/legacy/build/pdf",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pdfjs-dist_legacy_build_pdf_mjs.js"
-    ]
-  },
   "node_modules/@supabase/auth-js/dist/module/lib/helpers.js -> @supabase/node-fetch": {
     "id": "node_modules/@supabase/auth-js/dist/module/lib/helpers.js -> @supabase/node-fetch",
     "files": []
