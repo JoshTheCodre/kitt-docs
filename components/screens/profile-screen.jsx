@@ -83,7 +83,9 @@ export default function ProfileScreen({ user, onNavigate }) {
       }
 
       // Clear user state after successful signout
-      clearUser();
+      if (typeof clearUser === 'function') {
+        clearUser();
+      }
 
       // Clear any localStorage or sessionStorage
       if (typeof window !== 'undefined') {
@@ -95,21 +97,12 @@ export default function ProfileScreen({ user, onNavigate }) {
         title: "Signed out successfully",
         description: "You have been logged out.",
       });
-    } catch (error) {
-      console.error('Unexpected signout error:', error);
-      toast({
-        title: "Error signing out",
-        description: "An unexpected error occurred during signout.",
-        variant: "destructive",
-      });
-    }
-  }
 
-        // Force page reload to reset all state
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      }
+      // Force page reload to reset all state
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
     } catch (err) {
       console.error('Unexpected signout error:', err);
       toast({
