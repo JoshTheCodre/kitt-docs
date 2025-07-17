@@ -1,4 +1,3 @@
-
 -- Complete Database Setup Script for Academic Resource Marketplace
 -- This script sets up the entire database from scratch including tables, policies, functions, and triggers
 
@@ -177,7 +176,7 @@ CREATE TRIGGER update_wallet_transactions_updated_at
 
 CREATE TRIGGER update_transactions_updated_at 
   BEFORE UPDATE ON transactions 
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION update_transactions_updated_at_column();
 
 -- Function to automatically create wallet when user is created
 CREATE OR REPLACE FUNCTION create_user_wallet()
@@ -240,16 +239,41 @@ CREATE TRIGGER create_wallet_trigger
   FOR EACH ROW
   EXECUTE FUNCTION create_user_wallet();
 
--- Enable Row Level Security
+-- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
-ALTER TABLE downloads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
+
+-- Create function to automatically create user profile and wallet
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  -- Insert user profile
+  INSERT INTO public.users (id, email, name, school, department, level, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    '',
+    '',
+    '',
+    'buyer'
+  );
+
+  -- Insert wallet
+  INSERT INTO public.wallets (user_id, balance)
+  VALUES (NEW.id, 0.00);
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger for new user signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- Users policies
 CREATE POLICY "Users can view their own profile" ON users

@@ -69,10 +69,7 @@ export default function ProfileScreen({ user, onNavigate }) {
 
   const handleSignOut = async () => {
     try {
-      // Clear user state first
-      clearUser();
-
-      // Sign out from Supabase
+      // Sign out from Supabase first
       const { error } = await supabase.auth.signOut();
 
       if (error) {
@@ -82,17 +79,31 @@ export default function ProfileScreen({ user, onNavigate }) {
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        // Clear any localStorage or sessionStorage
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('app-storage');
-          sessionStorage.clear();
-        }
+        return;
+      }
 
-        toast({
-          title: "Signed out successfully",
-          description: "You have been logged out.",
-        });
+      // Clear user state after successful signout
+      clearUser();
+
+      // Clear any localStorage or sessionStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('app-storage');
+        sessionStorage.clear();
+      }
+
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out.",
+      });
+    } catch (error) {
+      console.error('Unexpected signout error:', error);
+      toast({
+        title: "Error signing out",
+        description: "An unexpected error occurred during signout.",
+        variant: "destructive",
+      });
+    }
+  }
 
         // Force page reload to reset all state
         setTimeout(() => {

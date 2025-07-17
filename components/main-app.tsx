@@ -64,30 +64,40 @@ useEffect(() => {
         setUser(session.user);
 
         // Check if user profile exists, if not create one
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile, error: profileCheckError } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single();
 
-        if (!existingProfile) {
-          // Create profile for Google OAuth users
-          const { error: profileError } = await supabase.from("users").insert({
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email,
-            school: '',
-            department: '',
-            level: '',
-            role: 'buyer'
-          });
-
-          if (!profileError) {
-            // Create wallet
-            await supabase.from("wallets").insert({
-              user_id: session.user.id,
-              balance: 0.00,
+        if (!existingProfile && !profileCheckError?.message?.includes('No rows')) {
+          try {
+            // Create profile for OAuth users
+            const { error: profileError } = await supabase.from("users").insert({
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0],
+              school: '',
+              department: '',
+              level: '',
+              role: 'buyer'
             });
+
+            if (profileError) {
+              console.error('Profile creation error:', profileError);
+            } else {
+              // Create wallet
+              const { error: walletError } = await supabase.from("wallets").insert({
+                user_id: session.user.id,
+                balance: 0.00,
+              });
+
+              if (walletError) {
+                console.error('Wallet creation error:', walletError);
+              }
+            }
+          } catch (error) {
+            console.error('Error creating user profile:', error);
           }
         }
 

@@ -71,7 +71,7 @@ export default function AuthScreen() {
         if (error) throw error;
 
         if (data.user) {
-          // Wait for email confirmation in production
+          // Check if email confirmation is required
           if (!data.user.email_confirmed_at && data.user.confirmation_sent_at) {
             toast({
               title: "Check your email",
@@ -80,38 +80,66 @@ export default function AuthScreen() {
             return;
           }
 
-          // Create user profile
-          const { error: profileError } = await supabase.from("users").insert({
-            id: data.user.id,
-            email: data.user.email,
-            name,
-            school,
-            department,
-            level,
-            role: 'buyer',
-            created_at: new Date().toISOString()
-          });
+          // Wait a moment for user to be properly created
+          await new Promise(resolve => setTimeout(resolve, 1000));
 
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-            throw new Error(`Failed to create user profile: ${profileError.message}`);
+          try {
+            // Check if user already exists in our users table
+            const { data: existingUser } = await supabase
+              .from("users")
+              .select("id")
+              .eq("id", data.user.id)
+              .single();
+
+            if (!existingUser) {
+              // Create user profile
+              const { data: profileData, error: profileError } = await supabase
+                .from("users")
+                .insert({
+                  id: data.user.id,
+                  email: data.user.email || email,
+                  name: name,
+                  school: school,
+                  department: department,
+                  level: level,
+                  role: 'buyer'
+                })
+                .select()
+                .single();
+
+              if (profileError) {
+                console.error('Profile creation error:', profileError);
+                throw new Error(`Failed to create user profile: ${profileError.message}`);
+              }
+
+              // Create wallet
+              const { error: walletError } = await supabase
+                .from("wallets")
+                .insert({
+                  user_id: data.user.id,
+                  balance: 0.00,
+                });
+
+              if (walletError) {
+                console.error('Wallet creation error:', walletError);
+                // Don't throw error for wallet creation as it's not critical
+                console.warn('Wallet will be created later');
+              }
+            }
+
+            toast({
+              title: "Account created!",
+              description: "Welcome to Qitt! You can now start exploring.",
+            });
+          } catch (dbError) {
+            console.error('Database error during registration:', dbError);
+            // Still allow login even if profile creation fails
+            toast({
+              title: "Account created",
+              description: "Your account was created but some setup may be incomplete. Please try logging in.",
+              variant: "default",
+            });
           }
-
-          // Create wallet
-          const { error: walletError } = await supabase.from("wallets").insert({
-            user_id: data.user.id,
-            balance: 0.00,
-          });
-
-          if (walletError) {
-            console.error('Wallet creation error:', walletError);
-            throw new Error(`Failed to create wallet: ${walletError.message}`);
-          }
-
-          toast({
-            title: "Account created!",
-            description: "Welcome to Qitt! You can now start exploring.",
-          });
         }
       }
     } catch (error) {
