@@ -52,16 +52,15 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // For Google Profile Modal
+  // Google profile modal state
   const [showGoogleProfile, setShowGoogleProfile] = useState(false);
   const [googleUserId, setGoogleUserId] = useState("");
   const [googleUserEmail, setGoogleUserEmail] = useState("");
 
-  // 1. Normal email/password login/register logic (unchanged)
+  // 1. Regular email/password auth logic
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
@@ -133,7 +132,7 @@ export default function AuthScreen() {
                 .from("wallets")
                 .insert({
                   user_id: data.user.id,
-                  balance: 0.00,
+                  balance: 0.0,
                 });
 
               if (walletError) {
@@ -167,19 +166,18 @@ export default function AuthScreen() {
     }
   };
 
-  // 2. Google Auth logic (with modal on registration)
+  // 2. Google Auth logic
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: window.location.origin,
         },
       });
       if (error) throw error;
-
-      // User will be redirected, so pause here
+      // Redirect will happen; nothing more to do here
     } catch (error) {
       toast({
         title: "Authentication failed",
@@ -190,13 +188,13 @@ export default function AuthScreen() {
     }
   };
 
-  // 3. Check Google session after redirect, and show modal if user is new
+  // 3. After Google login: show modal if profile missing, and prefill name
   useEffect(() => {
     const checkGoogleUser = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return; // Not logged in
+      if (!user) return;
 
       const { data: existingUser } = await supabase
         .from("users")
@@ -204,18 +202,23 @@ export default function AuthScreen() {
         .eq("id", user.id)
         .single();
 
-      // If not found in users table, and we're not already in profile modal
       if (!existingUser && !showGoogleProfile) {
         setGoogleUserId(user.id);
         setGoogleUserEmail(user.email || "");
+        // Prefill name if provided by Google
+        setName(
+          user.user_metadata?.full_name || user.user_metadata?.name || "",
+        );
         setShowGoogleProfile(true);
       }
     };
 
     checkGoogleUser();
+    // Only run after Google login or when modal closes
+    // eslint-disable-next-line
   }, [showGoogleProfile]);
 
-  // 4. Handle Google Profile Creation (after modal submit)
+  // 4. Handle Google profile creation (modal submit)
   const handleGoogleProfile = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -224,6 +227,7 @@ export default function AuthScreen() {
         throw new Error("Please fill in all required fields");
       }
 
+      // Insert user profile
       const { error: profileError } = await supabase.from("users").insert({
         id: googleUserId,
         email: googleUserEmail,
@@ -240,17 +244,14 @@ export default function AuthScreen() {
         );
       }
 
-      // Create wallet for the Google user
-      const { error: walletError } = await supabase
-        .from("wallets")
-        .insert({
-          user_id: googleUserId,
-          balance: 0.00,
-        });
+      // Insert wallet for the user
+      const { error: walletError } = await supabase.from("wallets").insert({
+        user_id: googleUserId,
+        balance: 0.0,
+      });
 
       if (walletError) {
         console.error("Wallet creation error:", walletError);
-        // Don't throw error here as profile was created successfully
       }
 
       setShowGoogleProfile(false);
@@ -258,7 +259,7 @@ export default function AuthScreen() {
         title: "Profile completed!",
         description: "Welcome to Qitt! You can now start exploring.",
       });
-      // Optional: reload page or redirect
+      // You may want to reload or redirect user here
     } catch (err) {
       toast({
         title: "Profile creation failed",
@@ -475,7 +476,7 @@ export default function AuthScreen() {
         </Card>
       </div>
 
-      {/* Google Profile Modal (appears only if Google login with missing profile) */}
+      {/* Google Profile Modal */}
       {showGoogleProfile && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <form
