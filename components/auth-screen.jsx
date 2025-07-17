@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, BookOpen } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  GraduationCap,
+  BookOpen,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -67,6 +75,11 @@ export default function AuthScreen() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              display_name: name, // uses the name the user entered
+            },
+          },
         });
         if (error) throw error;
 
@@ -75,13 +88,14 @@ export default function AuthScreen() {
           if (!data.user.email_confirmed_at && data.user.confirmation_sent_at) {
             toast({
               title: "Check your email",
-              description: "Please check your email and click the confirmation link to complete registration.",
+              description:
+                "Please check your email and click the confirmation link to complete registration.",
             });
             return;
           }
 
           // Wait a moment for user to be properly created
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
           try {
             // Check if user already exists in our users table
@@ -102,14 +116,16 @@ export default function AuthScreen() {
                   school: school,
                   department: department,
                   level: level,
-                  role: 'buyer'
+                  role: "buyer",
                 })
                 .select()
                 .single();
 
               if (profileError) {
-                console.error('Profile creation error:', profileError);
-                throw new Error(`Failed to create user profile: ${profileError.message}`);
+                console.error("Profile creation error:", profileError);
+                throw new Error(
+                  `Failed to create user profile: ${profileError.message}`,
+                );
               }
 
               // Create wallet
@@ -117,13 +133,13 @@ export default function AuthScreen() {
                 .from("wallets")
                 .insert({
                   user_id: data.user.id,
-                  balance: 0.00,
+                  balance: 0.0,
                 });
 
               if (walletError) {
-                console.error('Wallet creation error:', walletError);
+                console.error("Wallet creation error:", walletError);
                 // Don't throw error for wallet creation as it's not critical
-                console.warn('Wallet will be created later');
+                console.warn("Wallet will be created later");
               }
             }
 
@@ -132,11 +148,12 @@ export default function AuthScreen() {
               description: "Welcome to Qitt! You can now start exploring.",
             });
           } catch (dbError) {
-            console.error('Database error during registration:', dbError);
+            console.error("Database error during registration:", dbError);
             // Still allow login even if profile creation fails
             toast({
               title: "Account created",
-              description: "Your account was created but some setup may be incomplete. Please try logging in.",
+              description:
+                "Your account was created but some setup may be incomplete. Please try logging in.",
               variant: "default",
             });
           }
@@ -157,7 +174,7 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: window.location.origin,
         },
@@ -166,7 +183,6 @@ export default function AuthScreen() {
       if (error) {
         throw error;
       }
-
     } catch (error) {
       toast({
         title: "Authentication failed",
@@ -190,7 +206,9 @@ export default function AuthScreen() {
             {isLogin ? "Welcome back" : "Join Qitt"}
           </h1>
           <p className="text-gray-600">
-            {isLogin ? "Sign in to your account" : "Create your student account"}
+            {isLogin
+              ? "Sign in to your account"
+              : "Create your student account"}
           </p>
         </div>
 
@@ -242,7 +260,11 @@ export default function AuthScreen() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
 
@@ -260,7 +282,11 @@ export default function AuthScreen() {
                     />
                   </div>
 
-                  <Select value={department} onValueChange={setDepartment} required={!isLogin}>
+                  <Select
+                    value={department}
+                    onValueChange={setDepartment}
+                    required={!isLogin}
+                  >
                     <SelectTrigger className="h-12 border-gray-200 rounded-xl">
                       <SelectValue placeholder="Select Department" />
                     </SelectTrigger>
@@ -273,7 +299,11 @@ export default function AuthScreen() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={level} onValueChange={setLevel} required={!isLogin}>
+                  <Select
+                    value={level}
+                    onValueChange={setLevel}
+                    required={!isLogin}
+                  >
                     <SelectTrigger className="h-12 border-gray-200 rounded-xl">
                       <SelectValue placeholder="Select Level" />
                     </SelectTrigger>
@@ -294,7 +324,11 @@ export default function AuthScreen() {
                 disabled={loading}
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg"
               >
-                {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+                {loading
+                  ? "Please wait..."
+                  : isLogin
+                    ? "Sign In"
+                    : "Create Account"}
               </Button>
 
               {/* Divider */}
@@ -303,7 +337,9 @@ export default function AuthScreen() {
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-2 bg-white text-gray-500">
+                    Or continue with
+                  </span>
                 </div>
               </div>
 
@@ -316,10 +352,22 @@ export default function AuthScreen() {
                 className="w-full h-12 text-lg font-semibold rounded-xl border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 shadow-sm"
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
                 </svg>
                 Continue with Google
               </Button>
@@ -335,7 +383,9 @@ export default function AuthScreen() {
 
             <div className="text-center mt-6 pt-6 border-t border-gray-200">
               <p className="text-gray-600 text-sm">
-                {isLogin ? "Don't have an account?" : "Already have an account?"}
+                {isLogin
+                  ? "Don't have an account?"
+                  : "Already have an account?"}
               </p>
               <button
                 type="button"
