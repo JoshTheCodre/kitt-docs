@@ -1,26 +1,25 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
+import { ArrowUpCircle, ArrowDownCircle, CreditCard, Banknote, Smartphone, Building2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowUpRight, ArrowDownLeft, Plus, Download, Gift } from 'lucide-react';
 
 const WalletTransactionList = ({ transactions = [] }) => {
-  const getTransactionIcon = (type) => {
-    switch (type) {
-      case 'purchase':
-        return <ArrowUpRight className="w-5 h-5 text-red-500" />;
-      case 'deposit':
-      case 'funding':
-        return <Plus className="w-5 h-5 text-green-500" />;
-      case 'refund':
-        return <ArrowDownLeft className="w-5 h-5 text-blue-500" />;
-      case 'download':
-        return <Download className="w-5 h-5 text-purple-500" />;
-      case 'bonus':
-        return <Gift className="w-5 h-5 text-yellow-500" />;
-      default:
-        return <ArrowUpRight className="w-5 h-5 text-gray-500" />;
+  const getTransactionIcon = (type, method) => {
+    if (type === 'credit') {
+      if (method === 'paystack' || method === 'flutterwave') {
+        return <CreditCard className="w-5 h-5 text-green-500" />;
+      } else if (method === 'bank_transfer') {
+        return <Building2 className="w-5 h-5 text-green-500" />;
+      } else if (method === 'mobile_money') {
+        return <Smartphone className="w-5 h-5 text-green-500" />;
+      }
+      return <ArrowUpCircle className="w-5 h-5 text-green-500" />;
+    } else if (type === 'debit') {
+      return <ArrowDownCircle className="w-5 h-5 text-red-500" />;
     }
+    return <Banknote className="w-5 h-5 text-gray-500" />;
   };
 
   if (transactions.length === 0) {
@@ -39,7 +38,7 @@ const WalletTransactionList = ({ transactions = [] }) => {
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center">
-                  {getTransactionIcon(transaction.type)}
+                  {getTransactionIcon(transaction.type, transaction.method)}
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">

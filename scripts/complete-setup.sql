@@ -224,6 +224,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to create wallet when user is created
+CREATE OR REPLACE FUNCTION create_user_wallet()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO wallets (user_id, balance)
+  VALUES (NEW.id, 0.00);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to create wallet when user is created
+CREATE TRIGGER create_wallet_trigger
+  AFTER INSERT ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION create_user_wallet();
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE resources ENABLE ROW LEVEL SECURITY;

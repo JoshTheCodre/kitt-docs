@@ -41,58 +41,124 @@ export default function MainApp({ user }: MainAppProps) {
   } = useStore();
 
 useEffect(() => {
-    if (user) {
-      initializeUserData();
-    } else {
-      setInitializing(false);
-    }
-  }, [user]);
+    const initializeApp = async () => {
+      try {
+        setLoading(true);
 
-  const initializeUserData = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          setUser(session.user);
+          await fetchUserProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Handle OAuth callbacks
+    const handleAuthChange = async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+
+        // Check if user profile exists, if not create one
+        const { data: existingProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!existingProfile) {
+          // Create profile for Google OAuth users
+          const { error: profileError } = await supabase.from("users").insert({
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email,
+            school: '',
+            department: '',
+            level: '',
+            role: 'buyer'
+          });
+
+          if (!profileError) {
+            // Create wallet
+            await supabase.from("wallets").insert({
+              user_id: session.user.id,
+              balance: 0.00,
+            });
+          }
+        }
+
+        await fetchUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        clearUser();
+      }
+    };
+
+    initializeApp();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserProfile = async (userId: string) => {
     try {
-      setLoading(true);
-      setAuthError(null);
-      setUser(user);
-
-      // Get user profile with retry logic
-      let profile;
-      try {
-        profile = await DatabaseService.getUserById(user.id);
-        setProfile(profile);
-      } catch (profileError) {
-        console.error('Profile fetch error:', profileError);
-        setAuthError('Failed to load user profile');
-        toast({
-          title: "Profile Error",
-          description: "Failed to load your profile. Some features may not work correctly.",
-          variant: "destructive",
-        });
-      }
-
-      // Get user wallet with retry logic
-      try {
-        const wallet = await DatabaseService.getUserWallet(user.id);
-        setWallet(wallet);
-      } catch (walletError) {
-        console.error('Wallet fetch error:', walletError);
-        setAuthError('Failed to load wallet');
-        toast({
-          title: "Wallet Error", 
-          description: "Failed to load your wallet. Please refresh the page.",
-          variant: "destructive",
-        });
-      }
+      const profile = await DatabaseService.getUserById(userId);
+      setProfile(profile);
     } catch (error) {
-      console.error('Error initializing user data:', error);
-      setAuthError('Failed to initialize user data');
+      console.error("Failed to fetch user profile:", error);
       toast({
-        title: "Initialization Error",
-        description: "Failed to load your account data. Please try refreshing the page.",
+        title: "Profile Error",
+        description:
+          "Failed to load your profile. Some features may not work correctly.",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
-      setInitializing(false);
     }
   };
+
+  if (initializing) {
+    return <LoadingSkeleton />;
+  }
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case "home":
+        return <HomeScreen />;
+      case "explore":
+        return <ExploreScreen />;
+      case "library":
+        return <LibraryScreen />;
+      case "wallet":
+        return <WalletScreen />;
+      case "profile":
+        return <ProfileScreen />;
+      case "upload":
+        return <UploadScreen />;
+      case "resourceDetail":
+        return <ResourceDetailScreen />;
+      default:
+        return <HomeScreen />;
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen">
+      <TopNav />
+      <main className="flex-grow">
+        {authError && (
+          <div className="text-red-500 p-4">
+            {authError}
+          </div>
+        )}
+        {renderScreen()}
+      </main>
+      <BottomNav />
+      <Toaster />
+    </div>
+  );
 }
