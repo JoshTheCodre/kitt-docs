@@ -123,7 +123,7 @@ export default function AuthScreen() {
                 .select()
                 .single();
 
-              console.log('Profile created:', profileData)
+              console.log("Profile created:", profileData);
 
               if (profileError) {
                 console.error("Profile creation error:", profileError);
@@ -146,7 +146,7 @@ export default function AuthScreen() {
                 console.error("Wallet creation error:", walletError);
                 // Don't throw error here as profile was created successfully
               } else {
-                console.log('Wallet created:', walletData);
+                console.log("Wallet created:", walletData);
               }
             }
 
@@ -156,7 +156,7 @@ export default function AuthScreen() {
             });
           } catch (dbError) {
             toast({
-              title: "Account created", 
+              title: "Account created",
               description:
                 "Your account was created but some setup may be incomplete. Please try logging in.",
               variant: "default",
@@ -182,7 +182,10 @@ export default function AuthScreen() {
     if (!isLogin) {
       if (!name || !school || !department || !level) {
         setLoading(false);
-        toast({title: "Please fill in all required fields",variant: "destructive"})
+        toast({
+          title: "Please fill in all required fields",
+          variant: "destructive",
+        });
         throw new Error("Please fill in all required fields");
       }
     }
@@ -219,8 +222,8 @@ export default function AuthScreen() {
         .eq("id", user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking user:', error);
+      if (error && error.code !== "PGRST116") {
+        console.error("Error checking user:", error);
         return;
       }
 
@@ -236,8 +239,10 @@ export default function AuthScreen() {
     };
 
     // Listen to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
         await checkGoogleUser();
       }
     });
