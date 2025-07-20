@@ -109,7 +109,7 @@ export default function AuthScreen() {
               .single();
 
             if (!existingUser) {
-              const { error: profileError } = await supabase
+              const { data:dima, error: profileError } = await supabase
                 .from("users")
                 .insert({
                   id: data.user.id,
@@ -120,6 +120,8 @@ export default function AuthScreen() {
                   level: level,
                   role: "buyer",
                 });
+
+              console.log(dima)
 
               if (profileError) {
                 throw new Error(
@@ -147,7 +149,7 @@ export default function AuthScreen() {
             });
           } catch (dbError) {
             toast({
-              title: "Account created",
+              title: "Account created", 
               description:
                 "Your account was created but some setup may be incomplete. Please try logging in.",
               variant: "default",
@@ -169,6 +171,14 @@ export default function AuthScreen() {
   // 2. Google Auth logic
   const handleGoogleAuth = async () => {
     setLoading(true);
+    // if its register check if all fields are filled
+    if (!isLogin) {
+      if (!name || !school || !department || !level) {
+        setLoading(false);
+        toast({title: "Please fill in all required fields",variant: "destructive"})
+        throw new Error("Please fill in all required fields");
+      }
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -446,7 +456,7 @@ export default function AuthScreen() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Continue with Google
+                {isLogin ? "Login" : "Sign up"} with Google
               </Button>
             </form>
 
