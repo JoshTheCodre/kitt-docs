@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  Eye,
-  EyeOff,
-  Mail,
-  Lock,
-  User,
-  GraduationCap,
-  BookOpen,
-} from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,196 +18,111 @@ import InstallAppButton from "@/components/install-app-button";
 
 const departments = [
   "Computer Science",
+  "Software Engineering", 
+  "Information Technology",
+  "Cybersecurity",
+  "Data Science",
   "Engineering",
+  "Mechanical Engineering",
+  "Electrical Engineering",
+  "Civil Engineering",
+  "Chemical Engineering",
   "Medicine",
+  "Nursing",
+  "Pharmacy",
+  "Dentistry",
   "Law",
   "Business Administration",
+  "Marketing",
+  "Accounting",
+  "Finance",
   "Economics",
   "Psychology",
+  "Sociology",
+  "Political Science",
   "Biology",
   "Chemistry",
   "Physics",
   "Mathematics",
+  "Statistics",
   "English",
+  "Literature",
+  "History",
+  "Philosophy",
+  "Education",
+  "Architecture",
+  "Art & Design",
+  "Music",
+  "Theatre Arts",
+  "Mass Communication",
+  "Journalism",
   "Other",
 ];
 
+const schools = [
+  "University of Lagos (UNILAG)",
+  "University of Ibadan (UI)",
+  "Obafemi Awolowo University (OAU)",
+  "University of Nigeria, Nsukka (UNN)",
+  "Ahmadu Bello University (ABU)",
+  "University of Benin (UNIBEN)",
+  "Lagos State University (LASU)",
+  "Covenant University",
+  "Babcock University",
+  "Redeemer's University",
+  "Federal University of Technology, Akure (FUTA)",
+  "Federal University of Technology, Owerri (FUTO)",
+  "University of Port Harcourt (UNIPORT)",
+  "Delta State University (DELSU)",
+  "Rivers State University",
+  "Cross River University of Technology (CRUTECH)",
+  "University of Calabar (UNICAL)",
+  "Bayero University Kano (BUK)",
+  "University of Jos (UNIJOS)",
+  "Federal University Lokoja",
+  "University of Abuja",
+  "Nnamdi Azikiwe University (UNIZIK)",
+  "Imo State University (IMSU)",
+  "Michael Okpara University of Agriculture",
+  "Enugu State University of Science and Technology",
+  "Federal University of Agriculture, Abeokuta",
+  "Olabisi Onabanjo University",
+  "Tai Solarin University of Education",
+  "Other"
+];
+
 export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [isRegistration, setIsRegistration] = useState(false);
   const [school, setSchool] = useState("");
   const [department, setDepartment] = useState("");
   const [level, setLevel] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Google profile modal state
-  const [showGoogleProfile, setShowGoogleProfile] = useState(false);
-  const [googleUserId, setGoogleUserId] = useState("");
-  const [googleUserEmail, setGoogleUserEmail] = useState("");
-
-  // 1. Regular email/password auth logic
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        toast({
-          title: "Welcome back!",
-          description: "You've been logged in successfully.",
-        });
-      } else {
-        if (!name || !school || !department || !level) {
-          throw new Error("Please fill in all required fields");
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              display_name: name,
-            },
-          },
-        });
-        if (error) throw error;
-
-        if (data.user) {
-          if (!data.user.email_confirmed_at && data.user.confirmation_sent_at) {
-            toast({
-              title: "Check your email",
-              description:
-                "Please check your email and click the confirmation link to complete registration.",
-            });
-            return;
-          }
-
-          // Wait for user creation
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          try {
-            const { data: existingUser } = await supabase
-              .from("users")
-              .select("id")
-              .eq("id", data.user.id)
-              .single();
-
-            if (!existingUser) {
-              const { data: profileData, error: profileError } = await supabase
-                .from("users")
-                .insert({
-                  id: data.user.id,
-                  email: data.user.email || email,
-                  name: name,
-                  school: school,
-                  department: department,
-                  level: level,
-                  role: "buyer",
-                })
-                .select()
-                .single();
-
-              console.log("Profile created:", profileData);
-
-              if (profileError) {
-                console.error("Profile creation error:", profileError);
-                throw new Error(
-                  `Failed to create user profile: ${profileError.message}`,
-                );
-              }
-
-              // Create wallet for the user
-              const { data: walletData, error: walletError } = await supabase
-                .from("wallets")
-                .insert({
-                  user_id: data.user.id,
-                  balance: 0.0,
-                })
-                .select()
-                .single();
-
-              if (walletError) {
-                console.error("Wallet creation error:", walletError);
-                // Don't throw error here as profile was created successfully
-              } else {
-                console.log("Wallet created:", walletData);
-              }
-            }
-
-            toast({
-              title: "Account created!",
-              description: "Welcome to Qitt! You can now start exploring.",
-            });
-          } catch (dbError) {
-            toast({
-              title: "Account created",
-              description:
-                "Your account was created but some setup may be incomplete. Please try logging in.",
-              variant: "default",
-            });
-          }
-        }
-      }
-    } catch (error) {
-      toast({
-        title: "Authentication failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 2. Google Auth logic
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    // if its register check if all fields are filled
-    if (!isLogin) {
-      if (!name || !school || !department || !level) {
-        setLoading(false);
-        toast({
-          title: "Please fill in all required fields",
-          variant: "destructive",
-        });
-        throw new Error("Please fill in all required fields");
-      }
-    }
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
-      // Redirect will happen; nothing more to do here
-    } catch (error) {
-      toast({
-        title: "Authentication failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      setLoading(false);
-    }
-  };
-
-  // 3. After Google login: show modal if profile missing, and prefill name
   useEffect(() => {
-    const checkGoogleUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+    const checkAuthState = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await handleUserAfterAuth(session.user);
+      }
+    };
 
+    checkAuthState();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          await handleUserAfterAuth(session.user);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleUserAfterAuth = async (user) => {
+    try {
+      // Check if user exists in our database
       const { data: existingUser, error } = await supabase
         .from("users")
         .select("id")
@@ -227,79 +134,105 @@ export default function AuthScreen() {
         return;
       }
 
-      if (!existingUser && !showGoogleProfile) {
-        setGoogleUserId(user.id);
-        setGoogleUserEmail(user.email || "");
-        // Prefill name if provided by Google
-        setName(
-          user.user_metadata?.full_name || user.user_metadata?.name || "",
-        );
-        setShowGoogleProfile(true);
+      if (existingUser) {
+        // User exists, redirect to dashboard
+        window.location.href = "/home";
+      } else {
+        // New user, show registration form
+        setIsRegistration(true);
       }
-    };
+    } catch (error) {
+      console.error("Error handling user after auth:", error);
+    }
+  };
 
-    // Listen to auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await checkGoogleUser();
-      }
-    });
-
-    checkGoogleUser();
-
-    return () => subscription.unsubscribe();
-    // Only run after Google login or when modal closes
-    // eslint-disable-next-line
-  }, [showGoogleProfile]);
-
-  // 4. Handle Google profile creation (modal submit)
-  const handleGoogleProfile = async (e) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      if (!name || !school || !department || !level) {
-        throw new Error("Please fill in all required fields");
-      }
-
-      // Insert user profile
-      const { error: profileError } = await supabase.from("users").insert({
-        id: googleUserId,
-        email: googleUserEmail,
-        name,
-        school,
-        department,
-        level,
-        role: "buyer",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        },
       });
-
-      if (profileError) {
-        throw new Error(
-          `Failed to create user profile: ${profileError.message}`,
-        );
-      }
-
-      // Insert wallet for the user
-      const { error: walletError } = await supabase.from("wallets").insert({
-        user_id: googleUserId,
-        balance: 0.0,
+      if (error) throw error;
+    } catch (error) {
+      toast({
+        title: "Sign in failed",
+        description: error.message,
+        variant: "destructive",
       });
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteRegistration = async (e) => {
+    e.preventDefault();
+
+    if (!school || !department || !level) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No authenticated user found");
+
+      // Get user info from Google metadata
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0];
+      const image = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from("users")
+        .insert({
+          id: user.id,
+          email: user.email,
+          name: name,
+          image: image,
+          school: school,
+          department: department,
+          level: level,
+          role: "buyer",
+        });
+
+      if (profileError) throw profileError;
+
+      // Create wallet
+      const { error: walletError } = await supabase
+        .from("wallets")
+        .insert({
+          user_id: user.id,
+          balance: 0.0,
+        });
 
       if (walletError) {
         console.error("Wallet creation error:", walletError);
       }
 
-      setShowGoogleProfile(false);
       toast({
-        title: "Profile completed!",
-        description: "Welcome to Qitt! You can now start exploring.",
+        title: "Welcome to Qitt! 🎉",
+        description: "Your account has been created successfully.",
       });
-      // You may want to reload or redirect user here
-    } catch (err) {
+
+      // Redirect to dashboard
+      window.location.href = "/home";
+
+    } catch (error) {
+      console.error("Registration error:", error);
       toast({
-        title: "Profile creation failed",
-        description: err.message,
+        title: "Registration failed",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -307,164 +240,141 @@ export default function AuthScreen() {
     }
   };
 
+  if (isRegistration) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <BookOpen className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Complete Your Profile
+            </h1>
+            <p className="text-gray-600">
+              Tell us about your academic journey
+            </p>
+          </div>
+
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <form onSubmit={handleCompleteRegistration} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    University/School
+                  </label>
+                  <Select value={school} onValueChange={setSchool} required>
+                    <SelectTrigger className="h-12 border-gray-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Select your school" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-60">
+                      {schools.map((schoolOption) => (
+                        <SelectItem 
+                          key={schoolOption} 
+                          value={schoolOption}
+                          className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900"
+                        >
+                          {schoolOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Department
+                  </label>
+                  <Select value={department} onValueChange={setDepartment} required>
+                    <SelectTrigger className="h-12 border-gray-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Select your department" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg max-h-60">
+                      {departments.map((dept) => (
+                        <SelectItem 
+                          key={dept} 
+                          value={dept}
+                          className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900"
+                        >
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Level
+                  </label>
+                  <Select value={level} onValueChange={setLevel} required>
+                    <SelectTrigger className="h-12 border-gray-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Select your level" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg">
+                      <SelectItem value="100" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">100 Level</SelectItem>
+                      <SelectItem value="200" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">200 Level</SelectItem>
+                      <SelectItem value="300" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">300 Level</SelectItem>
+                      <SelectItem value="400" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">400 Level</SelectItem>
+                      <SelectItem value="500" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">500 Level</SelectItem>
+                      <SelectItem value="postgraduate" className="hover:bg-blue-50 cursor-pointer px-3 py-2 text-gray-900">Postgraduate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg"
+                >
+                  {loading ? "Creating Account..." : "Complete Registration"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo & Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+            <BookOpen className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {isLogin ? "Welcome back" : "Join Qitt"}
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">
+            Welcome to Qitt
           </h1>
-          <p className="text-gray-600">
-            {isLogin
-              ? "Sign in to your account"
-              : "Create your student account"}
+          <p className="text-lg text-gray-600">
+            Your ultimate student resource platform
           </p>
         </div>
 
         {/* Install App Button */}
         <InstallAppButton className="mb-6" />
 
-        {/* Auth Form */}
-        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur">
-          <CardContent className="p-6">
-            <form onSubmit={handleAuth} className="space-y-4">
-              {!isLogin && (
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Full Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10 h-12 border-gray-200 rounded-xl"
-                    required={!isLogin}
-                  />
-                </div>
-              )}
-
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  type="email"
-                  placeholder="Email Address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 border-gray-200 rounded-xl"
-                  required
-                />
+        {/* Auth Card */}
+        <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Get Started
+                </h2>
+                <p className="text-gray-600">
+                  Sign in with your Google account to continue
+                </p>
               </div>
-
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 border-gray-200 rounded-xl"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-
-              {!isLogin && (
-                <>
-                  <div className="relative">
-                    <GraduationCap className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="University/School"
-                      value={school}
-                      onChange={(e) => setSchool(e.target.value)}
-                      className="pl-10 h-12 border-gray-200 rounded-xl"
-                      required={!isLogin}
-                    />
-                  </div>
-
-                  <Select
-                    value={department}
-                    onValueChange={setDepartment}
-                    required={!isLogin}
-                  >
-                    <SelectTrigger className="h-12 border-gray-200 rounded-xl">
-                      <SelectValue placeholder="Select Department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={level}
-                    onValueChange={setLevel}
-                    required={!isLogin}
-                  >
-                    <SelectTrigger className="h-12 border-gray-200 rounded-xl">
-                      <SelectValue placeholder="Select Level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="100">100 Level</SelectItem>
-                      <SelectItem value="200">200 Level</SelectItem>
-                      <SelectItem value="300">300 Level</SelectItem>
-                      <SelectItem value="400">400 Level</SelectItem>
-                      <SelectItem value="500">500 Level</SelectItem>
-                      <SelectItem value="postgraduate">Postgraduate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
 
               <Button
-                type="submit"
+                onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg"
+                className="w-full h-14 text-lg font-semibold rounded-xl bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-200 hover:border-gray-300 shadow-sm transition-all duration-200"
               >
-                {loading
-                  ? "Please wait..."
-                  : isLogin
-                    ? "Sign In"
-                    : "Create Account"}
-              </Button>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              {/* Google OAuth Button */}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoogleAuth}
-                disabled={loading}
-                className="w-full h-12 text-lg font-semibold rounded-xl border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 shadow-sm"
-              >
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -482,98 +392,23 @@ export default function AuthScreen() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                {isLogin ? "Login" : "Sign up"} with Google
+                {loading ? "Signing in..." : "Continue with Google"}
               </Button>
-            </form>
 
-            {isLogin && (
-              <div className="text-center mt-4">
-                <button className="text-blue-600 text-sm hover:underline">
-                  Forgot your password?
-                </button>
+              <div className="text-center text-sm text-gray-500 leading-relaxed">
+                By continuing, you agree to our Terms of Service and acknowledge 
+                our Privacy Policy
               </div>
-            )}
-
-            <div className="text-center mt-6 pt-6 border-t border-gray-200">
-              <p className="text-gray-600 text-sm">
-                {isLogin
-                  ? "Don't have an account?"
-                  : "Already have an account?"}
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-blue-600 font-semibold hover:underline mt-1"
-              >
-                {isLogin ? "Sign up for free" : "Sign in instead"}
-              </button>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Google Profile Modal */}
-      {showGoogleProfile && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <form
-            onSubmit={handleGoogleProfile}
-            className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-4"
-          >
-            <h2 className="text-2xl font-bold mb-2 text-center">
-              Complete Your Profile
-            </h2>
-            <p className="text-gray-600 text-center mb-4">
-              We need a few more details to finish your registration.
-            </p>
-            <Input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              type="text"
-              placeholder="University/School"
-              value={school}
-              onChange={(e) => setSchool(e.target.value)}
-              required
-            />
-            <Select value={department} onValueChange={setDepartment} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={level} onValueChange={setLevel} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="100">100 Level</SelectItem>
-                <SelectItem value="200">200 Level</SelectItem>
-                <SelectItem value="300">300 Level</SelectItem>
-                <SelectItem value="400">400 Level</SelectItem>
-                <SelectItem value="500">500 Level</SelectItem>
-                <SelectItem value="postgraduate">Postgraduate</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl"
-              disabled={loading}
-            >
-              {loading ? "Completing..." : "Finish Registration"}
-            </Button>
-          </form>
+        <div className="text-center mt-8">
+          <p className="text-gray-500 text-sm">
+            New to Qitt? Your account will be created automatically
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }

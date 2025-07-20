@@ -15,77 +15,110 @@ export type Database = {
           id: string
           name: string
           email: string
+          image: string | null
           school: string
           department: string
           level: string
-          role: "buyer" | "uploader"
+          role: "buyer" | "uploader" | "admin"
           created_at: string
+          updated_at: string
+          is_verified: boolean
+          total_earnings: number
+          total_spent: number
         }
         Insert: {
           id: string
           name: string
           email: string
+          image?: string | null
           school: string
           department: string
           level: string
-          role?: "buyer" | "uploader"
+          role?: "buyer" | "uploader" | "admin"
         }
         Update: {
           name?: string
+          image?: string | null
           school?: string
           department?: string
           level?: string
-          role?: "buyer" | "uploader"
+          role?: "buyer" | "uploader" | "admin"
+          is_verified?: boolean
         }
       }
       resources: {
         Row: {
           id: string
           title: string
+          description: string | null
           uploader_id: string
           department: string
           level: string
           price: number
           tags: string[]
-          storage_path: string
-          created_at: string
-          description?: string
           file_type: string
+          file_size: number | null
+          storage_path: string
+          thumbnail_path: string | null
+          download_count: number
+          rating_average: number
+          rating_count: number
+          featured: boolean
+          approved: boolean
+          created_at: string
+          updated_at: string
         }
         Insert: {
           title: string
+          description?: string | null
           uploader_id: string
           department: string
           level: string
           price: number
-          tags: string[]
-          storage_path: string
-          description?: string
+          tags?: string[]
           file_type: string
+          file_size?: number | null
+          storage_path: string
+          thumbnail_path?: string | null
         }
         Update: {
           title?: string
+          description?: string | null
           department?: string
           level?: string
           price?: number
           tags?: string[]
-          description?: string
+          thumbnail_path?: string | null
+          featured?: boolean
+          approved?: boolean
         }
       }
       transactions: {
         Row: {
           id: string
           buyer_id: string
+          seller_id: string
           resource_id: string
           amount: number
-          timestamp: string
+          status: string
+          transaction_type: string
+          payment_method: string
+          reference_id: string | null
+          created_at: string
         }
         Insert: {
           buyer_id: string
+          seller_id: string
           resource_id: string
           amount: number
+          status?: string
+          transaction_type?: string
+          payment_method?: string
+          reference_id?: string | null
         }
-        Update: never
+        Update: {
+          status?: string
+        }
       }
       wallets: {
         Row: {

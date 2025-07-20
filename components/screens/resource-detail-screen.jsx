@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import ShareMaterialModal from "@/components/share-material-modal";
+import FilePreview from "@/components/file-preview";
 
 export default function ResourceDetailScreen({
   user,
@@ -252,6 +252,8 @@ export default function ResourceDetailScreen({
     }
   };
 
+  const hasAccess = resource.price === 0 || isOwned;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       {/* Floating Header */}
@@ -306,7 +308,7 @@ export default function ResourceDetailScreen({
               </div>
             )}
           </div>
-          
+
           <div className="space-y-2">
             <h1 className="text-3xl font-black text-gray-900 leading-tight">
               {resource.title}
@@ -387,7 +389,7 @@ export default function ResourceDetailScreen({
                     {loading ? "Processing..." : `Purchase for ₦${resource.price.toLocaleString()} 💳`}
                   </Button>
                 )}
-                
+
                 {userWallet && resource.price > 0 && !isOwned && (
                   <p className="text-sm text-gray-600">
                     💰 Your balance: ₦{userWallet.balance.toLocaleString()}
@@ -397,6 +399,37 @@ export default function ResourceDetailScreen({
             </div>
           </CardContent>
         </Card>
+
+        {/* File Preview Section */}
+        <FilePreview 
+          resource={resource}
+          onDownload={handleDownload}
+          canPreview={hasAccess}
+        />
+
+        {!hasAccess && (
+          <Card className="rounded-2xl shadow-sm bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+            <CardContent className="p-6 text-center">
+              <div className="mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Purchase Required
+                </h3>
+                <p className="text-gray-600">
+                  Get instant access to this resource and support the creator
+                </p>
+              </div>
+              <Button 
+                onClick={handleDownload}
+                disabled={loading}
+                size="lg"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-8 rounded-xl"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                {loading ? "Processing..." : `Purchase & Download - ₦${resource.price}`}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
