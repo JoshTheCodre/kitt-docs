@@ -109,7 +109,7 @@ export default function AuthScreen() {
               .single();
 
             if (!existingUser) {
-              const { data:dima, error: profileError } = await supabase
+              const { data: profileData, error: profileError } = await supabase
                 .from("users")
                 .insert({
                   id: data.user.id,
@@ -119,27 +119,34 @@ export default function AuthScreen() {
                   department: department,
                   level: level,
                   role: "buyer",
-                });
+                })
+                .select()
+                .single();
 
-              console.log(dima)
+              console.log('Profile created:', profileData)
 
               if (profileError) {
+                console.error("Profile creation error:", profileError);
                 throw new Error(
                   `Failed to create user profile: ${profileError.message}`,
                 );
               }
 
               // Create wallet for the user
-              const { error: walletError } = await supabase
+              const { data: walletData, error: walletError } = await supabase
                 .from("wallets")
                 .insert({
                   user_id: data.user.id,
                   balance: 0.0,
-                });
+                })
+                .select()
+                .single();
 
               if (walletError) {
                 console.error("Wallet creation error:", walletError);
                 // Don't throw error here as profile was created successfully
+              } else {
+                console.log('Wallet created:', walletData);
               }
             }
 
@@ -206,11 +213,16 @@ export default function AuthScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error } = await supabase
         .from("users")
         .select("id")
         .eq("id", user.id)
         .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking user:', error);
+        return;
+      }
 
       if (!existingUser && !showGoogleProfile) {
         setGoogleUserId(user.id);
@@ -223,7 +235,16 @@ export default function AuthScreen() {
       }
     };
 
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await checkGoogleUser();
+      }
+    });
+
     checkGoogleUser();
+
+    return () => subscription.unsubscribe();
     // Only run after Google login or when modal closes
     // eslint-disable-next-line
   }, [showGoogleProfile]);
