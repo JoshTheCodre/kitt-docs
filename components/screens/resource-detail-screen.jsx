@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,20 +9,30 @@ import {
   Heart,
   Share,
   Sparkles,
-  Zap,
   Shield,
   Clock,
   Users,
   Star,
   Flame,
+  BarChart3,
+  Eye,
+  Calendar,
+  DollarSign,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import ShareMaterialModal from "@/components/share-material-modal";
 import FilePreview from "@/components/file-preview";
+import {
+  fetchResourceStats,
+  checkUserPermissions,
+  purchaseResource,
+  downloadResource,
+  toggleFavorite,
+} from "@/functions/resource-detail-fns";
 
 export default function ResourceDetailScreen({
   user,
@@ -31,63 +42,126 @@ export default function ResourceDetailScreen({
 }) {
   const [loading, setLoading] = useState(false);
   const [userWallet, setUserWallet] = useState(null);
-  const [isOwned, setIsOwned] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [permissions, setPermissions] = useState({
+    hasOwnership: false,
+    isFavorited: false,
+    hasDownloaded: false,
+  });
+  const [stats, setStats] = useState({
+    downloadCount: 0,
+    purchaseCount: 0,
+    favoritesCount: 0,
+  });
+  const [ownerStats, setOwnerStats] = useState({
+    totalEarnings: 0,
+    totalPurchases: 0,
+    totalViews: 0,
+    recentActivity: [],
+  });
   const [showShareModal, setShowShareModal] = useState(false);
-  const [downloadCount, setDownloadCount] = useState(0);
   const { toast } = useToast();
+
+  const isOwner = user?.id === resource?.uploader_id;
 
   useEffect(() => {
     if (!user?.id || !resource?.id) return;
-    fetchUserWallet();
-    checkOwnership();
-    checkFavorite();
-    fetchStats();
+    
+    console.log("Initializing resource detail screen for:", resource.title);
+    initializeData();
   }, [user?.id, resource?.id]);
 
+  const initializeData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all required data in parallel
+      const [walletData, permissionsData, statsData] = await Promise.all([
+        fetchUserWallet(),
+        checkUserPermissions(user.id, resource.id),
+        fetchResourceStats(resource.id),
+      ]);
+
+      setUserWallet(walletData);
+      setPermissions(permissionsData);
+      setStats(statsData);
+
+      // Fetch owner-specific stats if user is the owner
+      if (isOwner) {
+        await fetchOwnerStats();
+      }
+
+      console.log("Resource data initialized successfully");
+    } catch (error) {
+      console.error("Error initializing resource data:", error);
+      toast({
+        title: "Error loading resource 😅",
+        description: "Please refresh and try again",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchUserWallet = async () => {
-    const { data } = await supabase
-      .from("wallets")
-      .select("balance")
-      .eq("user_id", user.id)
-      .single();
-
-    if (data) setUserWallet(data);
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .single();
+      
+      console.log("User wallet balance:", data?.balance || 0);
+      return data;
+    } catch (error) {
+      console.error("Error fetching wallet:", error);
+      return null;
+    }
   };
 
-  const checkOwnership = async () => {
-    const { data } = await supabase
-      .from("purchases")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("resource_id", resource.id)
-      .single();
+  const fetchOwnerStats = async () => {
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      
+      // Fetch transactions for earnings
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("resource_id", resource.id);
 
-    setIsOwned(!!data);
-  };
+      // Fetch recent activity with user profiles
+      const { data: recentActivity } = await supabase
+        .from("transactions")
+        .select(`
+          *,
+          users!buyer_id (
+            name,
+            email
+          )
+        `)
+        .eq("resource_id", resource.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-  const checkFavorite = async () => {
-    const { data } = await supabase
-      .from("favorites")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("resource_id", resource.id)
-      .single();
+      const totalEarnings = transactions?.reduce((sum, t) => sum + t.amount * 0.9, 0) || 0;
+      const totalPurchases = transactions?.length || 0;
+      
+      setOwnerStats({
+        totalEarnings,
+        totalPurchases,
+        totalViews: stats.downloadCount, // Using downloads as proxy for views
+        recentActivity: recentActivity || [],
+      });
 
-    setIsFavorited(!!data);
-  };
-
-  const fetchStats = async () => {
-    const { data } = await supabase
-      .from("downloads")
-      .select("id")
-      .eq("resource_id", resource.id);
-
-    setDownloadCount(data?.length || 0);
+      console.log("Owner stats loaded:", { totalEarnings, totalPurchases });
+    } catch (error) {
+      console.error("Error fetching owner stats:", error);
+    }
   };
 
   const handleDownload = async () => {
-    if (resource.price > 0 && !isOwned) {
+    // Check if user needs to purchase first
+    if (resource.price > 0 && !permissions.hasOwnership) {
       toast({
         title: "Hold up! 🛑",
         description: "You need to purchase this resource first.",
@@ -98,23 +172,13 @@ export default function ResourceDetailScreen({
 
     setLoading(true);
     try {
-      const { data: existingDownload } = await supabase
-        .from("downloads")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("resource_id", resource.id)
-        .single();
+      console.log("Starting download for resource:", resource.id);
+      
+      // Record download in database
+      await downloadResource(user.id, resource.id);
 
-      if (!existingDownload) {
-        await supabase.from("downloads").insert({
-          user_id: user.id,
-          resource_id: resource.id,
-          downloaded_at: new Date().toISOString(),
-        });
-      }
-
-      let url = `https://vmfjidjxdofmdonivzzp.supabase.co/storage/v1/object/public/resources/${resource.storage_path}`;
-
+      // Trigger actual file download
+      const url = `https://vmfjidjxdofmdonivzzp.supabase.co/storage/v1/object/public/resources/${resource.storage_path}`;
       const a = document.createElement("a");
       a.href = url;
       a.download = resource.title || "download";
@@ -122,11 +186,17 @@ export default function ResourceDetailScreen({
       a.click();
       document.body.removeChild(a);
 
+      console.log("Download completed successfully");
       toast({
         title: "Downloaded! 🎉",
         description: "Your resource is ready to slay!",
       });
+
+      // Refresh stats
+      const newStats = await fetchResourceStats(resource.id);
+      setStats(newStats);
     } catch (error) {
+      console.error("Download failed:", error);
       toast({
         title: "Download failed 😭",
         description: "Try again bestie",
@@ -150,68 +220,24 @@ export default function ResourceDetailScreen({
 
     setLoading(true);
     try {
-      // Create purchase record
-      const { error: purchaseError } = await supabase
-        .from("purchases")
-        .insert({
-          user_id: user.id,
-          resource_id: resource.id,
-          price_paid: resource.price,
-          purchased_at: new Date().toISOString(),
-        });
+      console.log("Processing purchase for resource:", resource.id, "Amount:", resource.price);
+      
+      await purchaseResource(user.id, resource.id, resource.price);
 
-      if (purchaseError) throw purchaseError;
+      // Update local state
+      setPermissions(prev => ({ ...prev, hasOwnership: true }));
+      await fetchUserWallet().then(setUserWallet);
 
-      // Create transaction record
-      const { error: transactionError } = await supabase
-        .from("transactions")
-        .insert({
-          buyer_id: user.id,
-          seller_id: resource.uploader_id,
-          resource_id: resource.id,
-          amount: resource.price,
-          transaction_type: 'purchase',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-      if (transactionError) throw transactionError;
-
-      // Update buyer's wallet
-      const { error: buyerWalletError } = await supabase
-        .from("wallets")
-        .update({ balance: userWallet.balance - resource.price })
-        .eq("user_id", user.id);
-
-      if (buyerWalletError) throw buyerWalletError;
-
-      // Update seller's wallet
-      const sellerEarnings = resource.price * 0.9;
-      const { error: sellerWalletError } = await supabase.rpc('increment_wallet_balance', {
-        user_id_param: resource.uploader_id,
-        amount_param: sellerEarnings,
-      });
-
-      if (sellerWalletError) console.error("Error updating seller wallet:", sellerWalletError);
-
-      // Add to downloads
-      await supabase.from("downloads").insert({
-        user_id: user.id,
-        resource_id: resource.id,
-        downloaded_at: new Date().toISOString(),
-      });
-
-      setIsOwned(true);
-      await fetchUserWallet();
+      console.log("Purchase completed successfully");
       toast({
         title: "Purchase successful! 🎊",
         description: "You now own this resource! Time to download it!",
       });
     } catch (error) {
-      console.error("Purchase error:", error);
+      console.error("Purchase failed:", error);
       toast({
         title: "Purchase failed 😬",
-        description: "Something went wrong. Try again!",
+        description: error.message || "Something went wrong. Try again!",
         variant: "destructive",
       });
     } finally {
@@ -219,31 +245,22 @@ export default function ResourceDetailScreen({
     }
   };
 
-  const toggleFavorite = async () => {
+  const handleToggleFavorite = async () => {
     try {
-      if (isFavorited) {
-        await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("resource_id", resource.id);
-        setIsFavorited(false);
-        toast({
-          title: "Removed from favorites 💔",
-          description: "No longer in your favs!",
-        });
-      } else {
-        await supabase.from("favorites").insert({
-          user_id: user.id,
-          resource_id: resource.id,
-        });
-        setIsFavorited(true);
-        toast({
-          title: "Added to favorites! 💖",
-          description: "Added to your collection!",
-        });
-      }
+      console.log("Toggling favorite status for resource:", resource.id);
+      
+      const result = await toggleFavorite(user.id, resource.id, permissions.isFavorited);
+      
+      setPermissions(prev => ({ ...prev, isFavorited: result.isFavorited }));
+      
+      toast({
+        title: result.isFavorited ? "Added to favorites! 💖" : "Removed from favorites 💔",
+        description: result.isFavorited ? "Added to your collection!" : "No longer in your favs!",
+      });
+
+      console.log("Favorite toggled successfully:", result.isFavorited);
     } catch (error) {
+      console.error("Error toggling favorite:", error);
       toast({
         title: "Action failed 😅",
         description: "Try again bestie",
@@ -252,7 +269,63 @@ export default function ResourceDetailScreen({
     }
   };
 
-  const hasAccess = resource.price === 0 || isOwned;
+  const handleShare = async () => {
+    try {
+      console.log("Sharing resource:", resource.id);
+      
+      const shareUrl = `${window.location.origin}/resource/${resource.id}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: resource.title,
+          text: resource.description,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link Copied! 📋",
+          description: "Resource link copied to clipboard.",
+        });
+      }
+
+      // Record share analytics
+      const { supabase } = await import("@/lib/supabase");
+      await supabase.from("shares").insert({
+        user_id: user.id,
+        resource_id: resource.id,
+      });
+
+      console.log("Resource shared successfully");
+    } catch (error) {
+      console.error("Share failed:", error);
+      toast({
+        title: "Share Failed 😅",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatCurrency = (amount) => `₦${amount.toLocaleString()}`;
+  const formatDate = (dateString) => new Date(dateString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  const hasAccess = resource.price === 0 || permissions.hasOwnership;
+
+  if (loading && !resource) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading resource...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
@@ -272,21 +345,21 @@ export default function ResourceDetailScreen({
             <Button
               variant="ghost"
               size="sm"
-              onClick={toggleFavorite}
+              onClick={handleToggleFavorite}
               className={`rounded-full w-10 h-10 p-0 ${
-                isFavorited ? "bg-red-100 hover:bg-red-200" : "hover:bg-pink-100"
+                permissions.isFavorited ? "bg-red-100 hover:bg-red-200" : "hover:bg-pink-100"
               }`}
             >
               <Heart
                 className={`w-5 h-5 ${
-                  isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"
+                  permissions.isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"
                 }`}
               />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowShareModal(true)}
+              onClick={handleShare}
               className="rounded-full w-10 h-10 p-0 hover:bg-blue-100"
             >
               <Share className="w-5 h-5 text-gray-600" />
@@ -330,75 +403,151 @@ export default function ResourceDetailScreen({
             </Badge>
             <Badge className="bg-orange-100 text-orange-800 border-orange-200 rounded-full px-3 py-1">
               <Flame className="w-3 h-3 mr-1" />
-              {downloadCount} downloads
+              {stats.downloadCount} downloads
             </Badge>
           </div>
         </div>
 
-        {/* Price Card */}
-        <Card className="bg-gradient-to-br from-white to-purple-50 border-0 shadow-xl rounded-3xl overflow-hidden">
-          <CardContent className="p-8 text-center">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600 uppercase tracking-wide font-semibold">
-                  {resource.price === 0 ? "Completely Free! 🎉" : "Price"}
-                </p>
-                <div className="text-5xl font-black text-gray-900">
+        {/* Owner Stats - Only show if user is the owner */}
+        {isOwner && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-green-100 text-sm">Total Earnings</p>
+                      <p className="text-2xl font-bold">{formatCurrency(ownerStats.totalEarnings)}</p>
+                    </div>
+                    <DollarSign className="w-8 h-8 text-green-200" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-0 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-blue-100 text-sm">Total Sales</p>
+                      <p className="text-2xl font-bold">{ownerStats.totalPurchases}</p>
+                    </div>
+                    <BarChart3 className="w-8 h-8 text-blue-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Activity */}
+            {ownerStats.recentActivity.length > 0 && (
+              <Card className="bg-white/90 backdrop-blur border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-gray-900">
+                    <Users className="w-5 h-5 mr-2" />
+                    Recent Purchases
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {ownerStats.recentActivity.slice(0, 5).map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Users className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {activity.users?.name || "Unknown User"}
+                            </div>
+                            <div className="text-gray-600 text-sm">
+                              {formatDate(activity.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-green-600 font-semibold">
+                          {formatCurrency(activity.amount)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Price Card - Show for non-owners */}
+        {!isOwner && (
+          <Card className="bg-gradient-to-br from-white to-purple-50 border-0 shadow-xl rounded-3xl overflow-hidden">
+            <CardContent className="p-8 text-center">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 uppercase tracking-wide font-semibold">
+                    {resource.price === 0 ? "Completely Free! 🎉" : "Price"}
+                  </p>
+                  <div className="text-5xl font-black text-gray-900">
+                    {resource.price === 0 ? (
+                      <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                        FREE
+                      </span>
+                    ) : (
+                      <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        {formatCurrency(resource.price)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <div className="space-y-3">
                   {resource.price === 0 ? (
-                    <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-                      FREE
-                    </span>
+                    <Button
+                      onClick={handleDownload}
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
+                      size="lg"
+                    >
+                      <Download className="w-5 h-5 mr-2" />
+                      {loading ? "Downloading..." : "Download Free! "}
+                    </Button>
+                  ) : permissions.hasOwnership ? (
+                    <Button
+                      onClick={handleDownload}
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
+                      size="lg"
+                    >
+                      <Download className="w-5 h-5 mr-2" />
+                      {loading ? "Downloading..." : "Download Now!"}
+                    </Button>
                   ) : (
-                    <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      ₦{resource.price.toLocaleString()}
-                    </span>
+                    <Button
+                      onClick={handlePurchase}
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
+                      size="lg"
+                    >
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      {loading ? "Processing..." : `Purchase for ${formatCurrency(resource.price)} 💳`}
+                    </Button>
+                  )}
+
+                  {userWallet && resource.price > 0 && !permissions.hasOwnership && (
+                    <p className="text-sm text-gray-600">
+                      💰 Your balance: {formatCurrency(userWallet.balance)}
+                    </p>
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Action Button */}
-              <div className="space-y-3">
-                {resource.price === 0 ? (
-                  <Button
-                    onClick={handleDownload}
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
-                    size="lg"
-                  >
-                    <Download className="w-5 h-5 mr-2" />
-                    {loading ? "Downloading..." : "Download Free! "}
-                  </Button>
-                ) : isOwned ? (
-                  <Button
-                    onClick={handleDownload}
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
-                    size="lg"
-                  >
-                    <Download className="w-5 h-5 mr-2" />
-                    {loading ? "Downloading..." : "Download Now!"}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handlePurchase}
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
-                    size="lg"
-                  >
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    {loading ? "Processing..." : `Purchase for ₦${resource.price.toLocaleString()} 💳`}
-                  </Button>
-                )}
-
-                {userWallet && resource.price > 0 && !isOwned && (
-                  <p className="text-sm text-gray-600">
-                    💰 Your balance: ₦{userWallet.balance.toLocaleString()}
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* File Preview Section */}
+        <FilePreview 
+          resource={resource}
+          onDownload={handleDownload}
+          canPreview={hasAccess}
+        />
 
         {/* Resource Details Card */}
         <Card className="rounded-2xl shadow-sm bg-white border border-gray-200">
@@ -420,43 +569,12 @@ export default function ResourceDetailScreen({
                 </div>
                 <div className="text-center">
                   <p className="text-sm text-gray-500">Downloads</p>
-                  <p className="font-medium text-gray-900">{downloadCount}</p>
+                  <p className="font-medium text-gray-900">{stats.downloadCount}</p>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* File Preview Section */}
-        <FilePreview 
-          resource={resource}
-          onDownload={handleDownload}
-          canPreview={hasAccess}
-        />
-
-        {!hasAccess && (
-          <Card className="rounded-2xl shadow-sm bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
-            <CardContent className="p-6 text-center">
-              <div className="mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Purchase Required
-                </h3>
-                <p className="text-gray-600">
-                  Get instant access to this resource and support the creator
-                </p>
-              </div>
-              <Button 
-                onClick={handlePurchase}
-                disabled={loading}
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-8 rounded-xl"
-              >
-                <CreditCard className="w-5 h-5 mr-2" />
-                {loading ? "Processing..." : `Purchase for ₦${resource.price.toLocaleString()}`}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
@@ -486,7 +604,7 @@ export default function ResourceDetailScreen({
                 <Users className="w-5 h-5 text-white" />
               </div>
               <h3 className="font-bold text-gray-900 text-sm mb-1">Popular</h3>
-              <p className="text-gray-600 text-xs">{downloadCount} downloads</p>
+              <p className="text-gray-600 text-xs">{stats.downloadCount} downloads</p>
             </CardContent>
           </Card>
         </div>
@@ -500,11 +618,7 @@ export default function ResourceDetailScreen({
               </div>
               <h3 className="font-bold text-gray-900">Quality Content</h3>
               <p className="text-gray-600 text-sm">
-                Uploaded {new Date(resource.created_at).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                })}
+                Uploaded {formatDate(resource.created_at)}
               </p>
             </div>
           </CardContent>
