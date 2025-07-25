@@ -1,205 +1,169 @@
+-- Complete Database Setup Script for Qitt App
+-- This script creates all necessary tables, functions, triggers, and policies
 
--- Enable necessary extensions
+-- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Drop existing tables if they exist (for fresh setup)
-DROP TABLE IF EXISTS notifications CASCADE;
-DROP TABLE IF EXISTS bookmarks CASCADE;
-DROP TABLE IF EXISTS reviews CASCADE;
-DROP TABLE IF EXISTS downloads CASCADE;
-DROP TABLE IF EXISTS transactions CASCADE;
-DROP TABLE IF EXISTS resources CASCADE;
-DROP TABLE IF EXISTS wallets CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+-- Drop existing tables if they exist (for clean setup)
+DROP TABLE IF EXISTS public.wallet_transactions CASCADE;
+DROP TABLE IF EXISTS public.downloads CASCADE;
+DROP TABLE IF EXISTS public.purchases CASCADE;
+DROP TABLE IF EXISTS public.favorites CASCADE;
+DROP TABLE IF EXISTS public.transactions CASCADE;
+DROP TABLE IF EXISTS public.resources CASCADE;
+DROP TABLE IF EXISTS public.wallets CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
 
 -- Create users table
-CREATE TABLE users (
-    id UUID PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    image TEXT, -- Google profile picture
-    school VARCHAR(255) NOT NULL,
-    department VARCHAR(255) NOT NULL,
-    level VARCHAR(50) NOT NULL,
-    role VARCHAR(20) DEFAULT 'buyer' CHECK (role IN ('buyer', 'uploader', 'admin')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+CREATE TABLE public.users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    image TEXT,
+    school TEXT NOT NULL,
+    department TEXT NOT NULL,
+    level TEXT NOT NULL,
+    role TEXT DEFAULT 'buyer' CHECK (role IN ('buyer', 'uploader', 'admin')),
     is_verified BOOLEAN DEFAULT false,
     total_earnings DECIMAL(10,2) DEFAULT 0.00,
-    total_spent DECIMAL(10,2) DEFAULT 0.00
+    total_spent DECIMAL(10,2) DEFAULT 0.00,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create wallets table
-CREATE TABLE wallets (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    balance DECIMAL(10,2) DEFAULT 0.00 NOT NULL CHECK (balance >= 0),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.wallets (
+    user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+    balance DECIMAL(10,2) DEFAULT 0.00 CHECK (balance >= 0),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create resources table
-CREATE TABLE resources (
+CREATE TABLE public.resources (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title VARCHAR(255) NOT NULL,
+    title TEXT NOT NULL,
     description TEXT,
-    uploader_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    department VARCHAR(255) NOT NULL,
-    level VARCHAR(50) NOT NULL,
-    price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+    uploader_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    department TEXT NOT NULL,
+    level TEXT NOT NULL,
+    price DECIMAL(10,2) DEFAULT 0.00 CHECK (price >= 0),
     tags TEXT[] DEFAULT '{}',
-    file_type VARCHAR(100) NOT NULL,
-    file_size BIGINT, -- File size in bytes
-    storage_path TEXT NOT NULL, -- Path to file in storage
-    thumbnail_path TEXT, -- Thumbnail/preview image
+    file_type TEXT NOT NULL,
+    file_size BIGINT,
+    storage_path TEXT NOT NULL,
+    thumbnail_path TEXT,
     download_count INTEGER DEFAULT 0,
-    rating_average DECIMAL(3,2) DEFAULT 0.00 CHECK (rating_average >= 0 AND rating_average <= 5),
+    rating_average DECIMAL(3,2) DEFAULT 0.00,
     rating_count INTEGER DEFAULT 0,
     featured BOOLEAN DEFAULT false,
     approved BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Create indexes for common queries
-    CONSTRAINT resources_title_check CHECK (LENGTH(title) >= 3)
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create transactions table
-CREATE TABLE transactions (
+CREATE TABLE public.transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+    buyer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    seller_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
     amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
-    status VARCHAR(20) DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
-    transaction_type VARCHAR(20) DEFAULT 'purchase' CHECK (transaction_type IN ('purchase', 'refund', 'withdrawal', 'deposit')),
-    payment_method VARCHAR(50) DEFAULT 'wallet',
-    reference_id VARCHAR(255) UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+    transaction_type TEXT DEFAULT 'purchase' CHECK (transaction_type IN ('purchase', 'refund')),
+    payment_method TEXT DEFAULT 'wallet',
+    reference_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create downloads table (track user downloads)
-CREATE TABLE downloads (
+-- Create wallet_transactions table
+CREATE TABLE public.wallet_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-    downloaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Prevent duplicate downloads tracking
-    UNIQUE(user_id, resource_id)
-);
-
--- Create reviews table
-CREATE TABLE reviews (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-    comment TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Prevent multiple reviews from same user for same resource
-    UNIQUE(user_id, resource_id)
-);
-
--- Create bookmarks table
-CREATE TABLE bookmarks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Prevent duplicate bookmarks
-    UNIQUE(user_id, resource_id)
-);
-
--- Create notifications table
-CREATE TABLE notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    message TEXT NOT NULL,
-    type VARCHAR(50) DEFAULT 'info' CHECK (type IN ('info', 'success', 'warning', 'error', 'purchase', 'sale', 'review')),
-    read BOOLEAN DEFAULT false,
-    action_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create wallet transactions table for detailed wallet history
-CREATE TABLE wallet_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     amount DECIMAL(10,2) NOT NULL,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('credit', 'debit')),
-    description TEXT NOT NULL,
-    reference_id VARCHAR(255),
-    balance_after DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    type TEXT NOT NULL CHECK (type IN ('credit', 'debit')),
+    method TEXT DEFAULT 'paystack' CHECK (method IN ('paystack', 'flutterwave', 'bank_transfer', 'mobile_money', 'internal')),
+    reference TEXT,
+    description TEXT,
+    status TEXT DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create purchases table
+CREATE TABLE public.purchases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
+    price_paid DECIMAL(10,2) NOT NULL,
+    purchased_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, resource_id)
+);
+
+-- Create downloads table
+CREATE TABLE public.downloads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
+    downloaded_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, resource_id)
+);
+
+-- Create favorites table
+CREATE TABLE public.favorites (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    resource_id UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, resource_id)
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_resources_uploader ON resources(uploader_id);
-CREATE INDEX idx_resources_department_level ON resources(department, level);
-CREATE INDEX idx_resources_created_at ON resources(created_at DESC);
-CREATE INDEX idx_resources_featured ON resources(featured) WHERE featured = true;
-CREATE INDEX idx_resources_price ON resources(price);
-CREATE INDEX idx_transactions_buyer ON transactions(buyer_id);
-CREATE INDEX idx_transactions_seller ON transactions(seller_id);
-CREATE INDEX idx_transactions_resource ON transactions(resource_id);
-CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
-CREATE INDEX idx_downloads_user ON downloads(user_id);
-CREATE INDEX idx_downloads_resource ON downloads(resource_id);
-CREATE INDEX idx_reviews_resource ON reviews(resource_id);
-CREATE INDEX idx_reviews_rating ON reviews(rating);
-CREATE INDEX idx_bookmarks_user ON bookmarks(user_id);
-CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
-CREATE INDEX idx_wallet_transactions_user ON wallet_transactions(user_id);
+CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_resources_uploader ON public.resources(uploader_id);
+CREATE INDEX idx_resources_department ON public.resources(department);
+CREATE INDEX idx_resources_level ON public.resources(level);
+CREATE INDEX idx_resources_price ON public.resources(price);
+CREATE INDEX idx_transactions_buyer ON public.transactions(buyer_id);
+CREATE INDEX idx_transactions_seller ON public.transactions(seller_id);
+CREATE INDEX idx_transactions_resource ON public.transactions(resource_id);
+CREATE INDEX idx_wallet_transactions_user ON public.wallet_transactions(user_id);
+CREATE INDEX idx_downloads_user ON public.downloads(user_id);
+CREATE INDEX idx_purchases_user ON public.purchases(user_id);
 
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+-- Create function to handle new user registration
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+  -- Create wallet for new user
+  INSERT INTO public.wallets (user_id, balance)
+  VALUES (NEW.id, 0.00)
+  ON CONFLICT (user_id) DO NOTHING;
+
+  RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_wallets_updated_at BEFORE UPDATE ON wallets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_resources_updated_at BEFORE UPDATE ON resources FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Create trigger for new user wallet creation
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Create function to update resource ratings
-CREATE OR REPLACE FUNCTION update_resource_rating()
-RETURNS TRIGGER AS $$
+-- Create function to increment wallet balance
+CREATE OR REPLACE FUNCTION increment_wallet_balance(user_id_param UUID, amount_param DECIMAL)
+RETURNS void AS $$
 BEGIN
-    UPDATE resources 
-    SET 
-        rating_average = (
-            SELECT COALESCE(AVG(rating), 0) 
-            FROM reviews 
-            WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
-        ),
-        rating_count = (
-            SELECT COUNT(*) 
-            FROM reviews 
-            WHERE resource_id = COALESCE(NEW.resource_id, OLD.resource_id)
-        )
-    WHERE id = COALESCE(NEW.resource_id, OLD.resource_id);
-    
-    RETURN COALESCE(NEW, OLD);
+  UPDATE public.wallets 
+  SET balance = balance + amount_param,
+      updated_at = NOW()
+  WHERE user_id = user_id_param;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Create trigger for rating updates
-CREATE TRIGGER update_resource_rating_trigger
-AFTER INSERT OR UPDATE OR DELETE ON reviews
-FOR EACH ROW EXECUTE FUNCTION update_resource_rating();
-
--- Create function to process transactions
-CREATE OR REPLACE FUNCTION process_transaction(
+-- Create function to process resource purchases
+CREATE OR REPLACE FUNCTION process_purchase(
     p_buyer_id UUID,
     p_resource_id UUID,
     p_amount DECIMAL
@@ -208,177 +172,106 @@ RETURNS JSON AS $$
 DECLARE
     v_seller_id UUID;
     v_buyer_balance DECIMAL;
+    v_seller_earnings DECIMAL;
     v_transaction_id UUID;
-    v_result JSON;
 BEGIN
-    -- Get seller ID
-    SELECT uploader_id INTO v_seller_id FROM resources WHERE id = p_resource_id;
-    
-    -- Check if buyer has sufficient balance
-    SELECT balance INTO v_buyer_balance FROM wallets WHERE user_id = p_buyer_id;
-    
+    -- Get seller ID and buyer balance
+    SELECT uploader_id INTO v_seller_id FROM public.resources WHERE id = p_resource_id;
+    SELECT balance INTO v_buyer_balance FROM public.wallets WHERE user_id = p_buyer_id;
+
+    -- Check sufficient balance
     IF v_buyer_balance < p_amount THEN
         RETURN json_build_object('success', false, 'error', 'Insufficient balance');
     END IF;
-    
-    -- Start transaction
+
+    -- Calculate seller earnings (95% after 5% platform fee)
+    v_seller_earnings := p_amount * 0.95;
+
+    -- Process transaction
     BEGIN
         -- Deduct from buyer
-        UPDATE wallets SET balance = balance - p_amount WHERE user_id = p_buyer_id;
-        
-        -- Add to seller (minus platform fee if any)
-        UPDATE wallets SET balance = balance + (p_amount * 0.95) WHERE user_id = v_seller_id;
-        
+        UPDATE public.wallets SET balance = balance - p_amount WHERE user_id = p_buyer_id;
+
+        -- Add to seller
+        UPDATE public.wallets SET balance = balance + v_seller_earnings WHERE user_id = v_seller_id;
+
         -- Create transaction record
-        INSERT INTO transactions (buyer_id, seller_id, resource_id, amount, reference_id)
+        INSERT INTO public.transactions (buyer_id, seller_id, resource_id, amount, reference_id)
         VALUES (p_buyer_id, v_seller_id, p_resource_id, p_amount, uuid_generate_v4()::text)
         RETURNING id INTO v_transaction_id;
-        
-        -- Add download record
-        INSERT INTO downloads (user_id, resource_id) 
-        VALUES (p_buyer_id, p_resource_id) 
+
+        -- Create purchase record
+        INSERT INTO public.purchases (user_id, resource_id, price_paid)
+        VALUES (p_buyer_id, p_resource_id, p_amount)
         ON CONFLICT (user_id, resource_id) DO NOTHING;
-        
-        -- Update download count
-        UPDATE resources SET download_count = download_count + 1 WHERE id = p_resource_id;
-        
-        -- Update user totals
-        UPDATE users SET total_spent = total_spent + p_amount WHERE id = p_buyer_id;
-        UPDATE users SET total_earnings = total_earnings + (p_amount * 0.95) WHERE id = v_seller_id;
-        
-        -- Create wallet transaction records
-        INSERT INTO wallet_transactions (user_id, amount, type, description, reference_id, balance_after)
-        VALUES (
-            p_buyer_id, 
-            -p_amount, 
-            'debit', 
-            'Purchase: Resource #' || p_resource_id::text,
-            v_transaction_id::text,
-            (SELECT balance FROM wallets WHERE user_id = p_buyer_id)
-        );
-        
-        INSERT INTO wallet_transactions (user_id, amount, type, description, reference_id, balance_after)
-        VALUES (
-            v_seller_id, 
-            (p_amount * 0.95), 
-            'credit', 
-            'Sale: Resource #' || p_resource_id::text,
-            v_transaction_id::text,
-            (SELECT balance FROM wallets WHERE user_id = v_seller_id)
-        );
-        
-        -- Create notifications
-        INSERT INTO notifications (user_id, title, message, type)
-        VALUES (
-            p_buyer_id,
-            'Purchase Successful',
-            'You have successfully purchased a resource',
-            'purchase'
-        );
-        
-        INSERT INTO notifications (user_id, title, message, type)
-        VALUES (
-            v_seller_id,
-            'New Sale',
-            'Someone purchased your resource',
-            'sale'
-        );
-        
-        v_result := json_build_object('success', true, 'transaction_id', v_transaction_id);
-        
+
+        -- Update resource download count
+        UPDATE public.resources SET download_count = download_count + 1 WHERE id = p_resource_id;
+
+        RETURN json_build_object('success', true, 'transaction_id', v_transaction_id);
+
     EXCEPTION WHEN OTHERS THEN
-        v_result := json_build_object('success', false, 'error', SQLERRM);
+        RETURN json_build_object('success', false, 'error', SQLERRM);
     END;
-    
-    RETURN v_result;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create RLS (Row Level Security) policies
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE downloads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.downloads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
 
--- Create policies for users
-CREATE POLICY "Users can view their own profile" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update their own profile" ON users FOR UPDATE USING (auth.uid() = id);
+-- Create RLS policies
+-- Users can view and update their own profile
+CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
 
--- Create policies for wallets
-CREATE POLICY "Users can view their own wallet" ON wallets FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can update their own wallet" ON wallets FOR UPDATE USING (auth.uid() = user_id);
+-- Users can view and update their own wallet
+CREATE POLICY "Users can view own wallet" ON public.wallets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own wallet" ON public.wallets FOR UPDATE USING (auth.uid() = user_id);
 
--- Create policies for resources
-CREATE POLICY "Anyone can view approved resources" ON resources FOR SELECT USING (approved = true);
-CREATE POLICY "Users can view their own resources" ON resources FOR SELECT USING (auth.uid() = uploader_id);
-CREATE POLICY "Users can create resources" ON resources FOR INSERT WITH CHECK (auth.uid() = uploader_id);
-CREATE POLICY "Users can update their own resources" ON resources FOR UPDATE USING (auth.uid() = uploader_id);
+-- Resources are publicly viewable but only owners can update
+CREATE POLICY "Resources are publicly viewable" ON public.resources FOR SELECT USING (true);
+CREATE POLICY "Users can insert own resources" ON public.resources FOR INSERT WITH CHECK (auth.uid() = uploader_id);
+CREATE POLICY "Users can update own resources" ON public.resources FOR UPDATE USING (auth.uid() = uploader_id);
 
--- Create policies for transactions
-CREATE POLICY "Users can view their own transactions" ON transactions FOR SELECT USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
+-- Transactions - users can view their own transactions
+CREATE POLICY "Users can view own transactions" ON public.transactions 
+FOR SELECT USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
 
--- Create policies for downloads
-CREATE POLICY "Users can view their own downloads" ON downloads FOR SELECT USING (auth.uid() = user_id);
+-- Wallet transactions - users can view their own
+CREATE POLICY "Users can view own wallet transactions" ON public.wallet_transactions 
+FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own wallet transactions" ON public.wallet_transactions 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Create policies for reviews
-CREATE POLICY "Anyone can view reviews" ON reviews FOR SELECT TO authenticated;
-CREATE POLICY "Users can create reviews" ON reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own reviews" ON reviews FOR UPDATE USING (auth.uid() = user_id);
+-- Purchases - users can view their own
+CREATE POLICY "Users can view own purchases" ON public.purchases 
+FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own purchases" ON public.purchases 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Create policies for bookmarks
-CREATE POLICY "Users can manage their own bookmarks" ON bookmarks FOR ALL USING (auth.uid() = user_id);
+-- Downloads - users can view and manage their own
+CREATE POLICY "Users can view own downloads" ON public.downloads 
+FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own downloads" ON public.downloads 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Create policies for notifications
-CREATE POLICY "Users can view their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
-
--- Create policies for wallet transactions
-CREATE POLICY "Users can view their own wallet transactions" ON wallet_transactions FOR SELECT USING (auth.uid() = user_id);
-
--- Insert sample data for testing (optional)
--- You can uncomment this section for testing purposes
-
-/*
--- Sample users
-INSERT INTO users (id, email, name, school, department, level, role) VALUES
-('123e4567-e89b-12d3-a456-426614174000', 'john@example.com', 'John Doe', 'University of Lagos', 'Computer Science', '400', 'buyer'),
-('123e4567-e89b-12d3-a456-426614174001', 'jane@example.com', 'Jane Smith', 'University of Ibadan', 'Engineering', '300', 'uploader');
-
--- Sample wallets
-INSERT INTO wallets (user_id, balance) VALUES
-('123e4567-e89b-12d3-a456-426614174000', 1000.00),
-('123e4567-e89b-12d3-a456-426614174001', 500.00);
-
--- Sample resources
-INSERT INTO resources (title, description, uploader_id, department, level, price, file_type, storage_path) VALUES
-('Advanced Algorithms Notes', 'Comprehensive notes on advanced algorithms and data structures', '123e4567-e89b-12d3-a456-426614174001', 'Computer Science', '400', 50.00, 'application/pdf', '/uploads/algorithms.pdf'),
-('Engineering Mathematics', 'Complete guide to engineering mathematics', '123e4567-e89b-12d3-a456-426614174001', 'Engineering', '200', 75.00, 'application/pdf', '/uploads/math.pdf');
-*/
-
--- Create function to initialize user wallet
-CREATE OR REPLACE FUNCTION create_user_wallet()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO wallets (user_id, balance) VALUES (NEW.id, 0.00);
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create trigger to auto-create wallet for new users
-CREATE TRIGGER create_user_wallet_trigger
-AFTER INSERT ON users
-FOR EACH ROW EXECUTE FUNCTION create_user_wallet();
+-- Favorites - users can manage their own
+CREATE POLICY "Users can view own favorites" ON public.favorites 
+FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own favorites" ON public.favorites 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own favorites" ON public.favorites 
+FOR DELETE USING (auth.uid() = user_id);
 
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
-
--- Final message
-SELECT 'Database setup completed successfully!' as status;

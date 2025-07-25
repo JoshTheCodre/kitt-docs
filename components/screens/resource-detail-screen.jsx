@@ -400,6 +400,33 @@ export default function ResourceDetailScreen({
           </CardContent>
         </Card>
 
+        {/* Resource Details Card */}
+        <Card className="rounded-2xl shadow-sm bg-white border border-gray-200">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">About this resource</h3>
+                {resource.description ? (
+                  <p className="text-gray-600 leading-relaxed">{resource.description}</p>
+                ) : (
+                  <p className="text-gray-500 italic">No description provided</p>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">File Type</p>
+                  <p className="font-medium text-gray-900">{resource.file_type}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Downloads</p>
+                  <p className="font-medium text-gray-900">{downloadCount}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* File Preview Section */}
         <FilePreview 
           resource={resource}
@@ -419,13 +446,13 @@ export default function ResourceDetailScreen({
                 </p>
               </div>
               <Button 
-                onClick={handleDownload}
+                onClick={handlePurchase}
                 disabled={loading}
                 size="lg"
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-8 rounded-xl"
               >
-                <Download className="w-5 h-5 mr-2" />
-                {loading ? "Processing..." : `Purchase & Download - ₦${resource.price}`}
+                <CreditCard className="w-5 h-5 mr-2" />
+                {loading ? "Processing..." : `Purchase for ₦${resource.price.toLocaleString()}`}
               </Button>
             </CardContent>
           </Card>
