@@ -11,7 +11,7 @@ import {
   Scale,
   Search,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { fetchExploreResources, checkUserDownloadedResources, fetchTrendingTags } from "@/functions/exploreFunctions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,97 +54,39 @@ export default function ExploreScreen({ user, onNavigate, onResourceSelect }) {
   const [trendingTags, setTrendingTags] = useState([]);
 
   useEffect(() => {
-    fetchResources();
-    fetchTrendingTags();
+    loadExploreData();
   }, [searchQuery, departmentFilter, levelFilter, priceFilter, verifiedFilter]);
 
-  const fetchTrendingTags = async () => {
-    try {
-      const { data } = await supabase
-        .from("resources")
-        .select("tags")
-        .not("tags", "is", null)
-        .limit(20);
-
-      if (data) {
-        // Extract and count all tags
-        const tagCounts = {};
-        data.forEach(resource => {
-          resource.tags?.forEach(tag => {
-            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-          });
-        });
-
-        // Sort by frequency and take top 5
-        const sortedTags = Object.entries(tagCounts)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 5)
-          .map(([tag]) => tag);
-
-        setTrendingTags(sortedTags);
-      }
-    } catch (error) {
-      console.error("Error fetching trending tags:", error);
-    }
-  };
-
-  const fetchResources = async () => {
+  const loadExploreData = async () => {
     setLoading(true);
-    let query = supabase.from("resources").select("*");
-
-    if (searchQuery) {
-      // Enhanced search: title, description, and tags
-      const searchTerm = searchQuery.toLowerCase();
-      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,tags.cs.{${searchTerm}}`);
+    try {
+      const filters = {
+        searchQuery,
+        departmentFilter,
+        levelFilter,
+        priceFilter,
+        verifiedFilter
+      };
+      
+      const [resourcesData, tagsData] = await Promise.all([
+        fetchExploreResources(filters),
+        fetchTrendingTags()
+      ]);
+      
+      // Check which resources user has downloaded
+      const resourcesWithDownloadStatus = await checkUserDownloadedResources(user?.id, resourcesData);
+      
+      setResources(resourcesWithDownloadStatus);
+      setTrendingTags(tagsData);
+    } catch (error) {
+      console.error("Error loading explore data:", error);
+    } finally {
+      setLoading(false);
     }
-
-    if (departmentFilter !== "all") {
-      query = query.eq("department", departmentFilter);
-    }
-
-    if (levelFilter !== "all") {
-      query = query.eq("level", levelFilter);
-    }
-
-    if (priceFilter === "free") {
-      query = query.eq("price", 0);
-    } else if (priceFilter === "paid") {
-      query = query.gt("price", 0);
-    }
-
-    if (verifiedFilter === "verified") {
-      query = query.eq("verified", true);
-    }
-
-    const { data } = await query.order("created_at", { ascending: false });
-
-    if (data) {
-      // Check if user has downloaded any resources
-      const downloadedResources = await checkDownloadedResources(data);
-      setResources(downloadedResources);
-    }
-    setLoading(false);
-  };
-
-  const checkDownloadedResources = async (resources) => {
-    if (!user) return resources;
-    
-    // Get user's downloaded resources
-    const { data: transactions } = await supabase
-      .from("transactions")
-      .select("resource_id")
-      .eq("buyer_id", user.id);
-
-    const downloadedIds = new Set(transactions?.map(t => t.resource_id) || []);
-
-    return resources.map(resource => ({
-      ...resource,
-      isDownloaded: downloadedIds.has(resource.id)
-    }));
   };
 
   const handleSearch = () => {
-    fetchResources();
+    loadExploreData();
   };
 
   return (

@@ -9,7 +9,8 @@ import {
   UploadIcon,
   Award,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { fetchUserProfile, fetchForYouResources } from "@/functions/homeFunctions";
+import { getGreeting } from "@/functions/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,52 +25,39 @@ export default function HomeScreen({ user, onNavigate }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUserProfile();
+    loadHomeData();
     console.log("User zzz : ", user);
   }, [user?.id]);
 
   useEffect(() => {
     if (profile) {
-      fetchForYouResources();
+      loadForYouResources();
     }
   }, [profile]);
 
-  const fetchUserProfile = async () => {
+  const loadHomeData = async () => {
+    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("users")
-        .select("name, school, department, level")
-        .eq("id", user.id)
-        .single();
-      if (data) {
-        setProfile(data);
+      const profileData = await fetchUserProfile(user.id);
+      if (profileData) {
+        setProfile(profileData);
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("Error loading home data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchForYouResources = async () => {
+  const loadForYouResources = async () => {
     if (!profile) return;
 
-    const { data } = await supabase
-      .from("resources")
-      .select("*")
-      .eq("department", profile.department)
-      .eq("level", profile.level)
-      .order("created_at", { ascending: false })
-      .limit(4);
-
-    if (data) setForYouResources(data);
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+    try {
+      const resources = await fetchForYouResources(profile);
+      setForYouResources(resources);
+    } catch (error) {
+      console.error("Error loading personalized resources:", error);
+    }
   };
 
   return (

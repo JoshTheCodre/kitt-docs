@@ -2,10 +2,10 @@
 import { supabase } from "@/lib/supabase";
 import { getUserTier } from "@/lib/tier-system";
 
-// Fetch complete user profile
+// Fetch user profile information
 export const fetchUserProfile = async (userId) => {
   try {
-    console.log("Fetching complete user profile for:", userId);
+    console.log("Fetching user profile for:", userId);
     
     const { data, error } = await supabase
       .from("users")
@@ -15,7 +15,7 @@ export const fetchUserProfile = async (userId) => {
 
     if (error) throw error;
     
-    console.log("Complete user profile fetched:", data?.name);
+    console.log("User profile fetched:", data?.name);
     return data;
   } catch (error) {
     console.error("Error fetching user profile:", error);
@@ -23,7 +23,7 @@ export const fetchUserProfile = async (userId) => {
   }
 };
 
-// Fetch user statistics (uploads, downloads, earnings)
+// Fetch user statistics
 export const fetchUserStats = async (userId) => {
   try {
     console.log("Fetching user stats for:", userId);
@@ -74,10 +74,10 @@ export const fetchUserTierInfo = async (userId) => {
 
     const tier = getUserTier(uploadCount || 0);
     
-    console.log("User tier info fetched:", tier);
+    console.log("User tier info:", tier);
     return tier;
   } catch (error) {
-    console.error("Error fetching user tier info:", error);
+    console.error("Error fetching tier info:", error);
     return null;
   }
 };
@@ -91,7 +91,8 @@ export const handleUserSignOut = async () => {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      throw error;
+      console.error('Signout error:', error);
+      return { success: false, error: error.message };
     }
 
     // Clear any localStorage or sessionStorage
@@ -102,8 +103,28 @@ export const handleUserSignOut = async () => {
 
     console.log("User signed out successfully");
     return { success: true };
+  } catch (err) {
+    console.error('Unexpected signout error:', err);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+};
+
+// Update user profile
+export const updateUserProfile = async (userId, updates) => {
+  try {
+    console.log("Updating user profile:", userId, updates);
+    
+    const { error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", userId);
+
+    if (error) throw error;
+
+    console.log("Profile updated successfully");
+    return { success: true };
   } catch (error) {
-    console.error("Error signing out:", error);
+    console.error("Error updating profile:", error);
     return { success: false, error: error.message };
   }
 };

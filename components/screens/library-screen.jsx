@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Download, Upload, FileText, BookOpen, Trash2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { fetchUserDownloads, fetchUserUploads, fetchUploadStats, handleResourceDownload, deleteUserResource } from "@/functions/libraryFunctions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,113 +19,34 @@ export default function LibraryScreen({ onNavigate }) {
 
   useEffect(() => {
     if (user?.id) {
-      fetchDownloads();
-      fetchUploads();
+      loadLibraryData();
     }
   }, [user?.id]);
 
-  const fetchDownloads = async () => {
+  const loadLibraryData = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("downloads")
-        .select(
-          `
-          id,
-          downloaded_at,
-          resources (
-            id,
-            title,
-            department,
-            level,
-            price,
-            file_type,
-            storage_path,
-            preview_path,
-            created_at
-          )
-        `,
-        )
-        .eq("user_id", user.id)
-        .order("downloaded_at", { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        const resources = data.map((item) => item.resources).filter(Boolean);
-        setDownloads(resources);
+      const [downloadsData, uploadsData] = await Promise.all([
+        fetchUserDownloads(user.id),
+        fetchUserUploads(user.id)
+      ]);
+      
+      setDownloads(downloadsData);
+      setUploads(uploadsData);
+      
+      if (uploadsData.length > 0) {
+        const stats = await fetchUploadStats(uploadsData);
+        setUploadStats(stats);
       }
     } catch (error) {
-      console.error("Error fetching downloads:", error);
-      setDownloads([]);
+      console.error("Error loading library data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUploads = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("resources")
-        .select("*")
-        .eq("uploader_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        setUploads(data);
-        fetchUploadStats(data);
-      }
-    } catch (error) {
-      console.error("Error fetching uploads:", error);
-      setUploads([]);
-    }
-  };
-
-  const fetchUploadStats = async (resources) => {
-    const stats = {};
-
-    for (const resource of resources) {
-      try {
-        // Get purchase count and total earnings
-        const { data: purchases } = await supabase
-          .from("transactions")
-          .select("amount")
-          .eq("resource_id", resource.id);
-
-        // Get download count
-        const { data: downloads } = await supabase
-          .from("downloads")
-          .select("id")
-          .eq("resource_id", resource.id);
-
-        // Get view count (simulated for now)
-        const viewCount = Math.floor(Math.random() * 1000) + 50;
-
-        stats[resource.id] = {
-          purchases: purchases?.length || 0,
-          totalEarnings:
-            purchases?.reduce((sum, p) => sum + p.amount * 0.9, 0) || 0,
-          downloads: downloads?.length || 0,
-          views: viewCount,
-        };
-      } catch (error) {
-        console.error("Error fetching stats for resource:", resource.id, error);
-        stats[resource.id] = {
-          purchases: 0,
-          totalEarnings: 0,
-          downloads: 0,
-          views: 0,
-        };
-      }
-    }
-
-    setUploadStats(stats);
-  };
-
   const handleDownload = (resource) => {
-    const url = `https://vmfjidjxdofmdonivzzp.supabase.co/storage/v1/object/public/resources/${resource.storage_path}`;
-    window.open(url, "_blank");
+    handleResourceDownload(resource);
   };
 
   const handleDeleteResource = async (resourceId) => {
@@ -137,19 +58,12 @@ export default function LibraryScreen({ onNavigate }) {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from("resources")
-        .delete()
-        .eq("id", resourceId)
-        .eq("uploader_id", user.id);
-
-      if (error) throw error;
-
+    const result = await deleteUserResource(resourceId, user.id);
+    if (result.success) {
       // Refresh uploads list
-      fetchUploads();
-    } catch (error) {
-      console.error("Delete error:", error);
+      loadLibraryData();
+    } else {
+      console.error("Delete error:", result.error);
     }
   };
 

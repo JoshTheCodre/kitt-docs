@@ -1,8 +1,73 @@
 
 import { supabase } from "@/lib/supabase";
-import { checkUserDownloads } from "./utils.js";
 
-// Fetch trending tags from resources
+// Fetch all resources with filters
+export const fetchExploreResources = async (filters = {}) => {
+  try {
+    console.log("Fetching explore resources with filters:", filters);
+    
+    let query = supabase.from("resources").select("*");
+
+    if (filters.searchQuery) {
+      const searchTerm = filters.searchQuery.toLowerCase();
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,tags.cs.{${searchTerm}}`);
+    }
+
+    if (filters.departmentFilter && filters.departmentFilter !== "all") {
+      query = query.eq("department", filters.departmentFilter);
+    }
+
+    if (filters.levelFilter && filters.levelFilter !== "all") {
+      query = query.eq("level", filters.levelFilter);
+    }
+
+    if (filters.priceFilter === "free") {
+      query = query.eq("price", 0);
+    } else if (filters.priceFilter === "paid") {
+      query = query.gt("price", 0);
+    }
+
+    if (filters.verifiedFilter === "verified") {
+      query = query.eq("verified", true);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    console.log("Resources fetched:", data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching explore resources:", error);
+    return [];
+  }
+};
+
+// Check which resources user has downloaded
+export const checkUserDownloadedResources = async (userId, resources) => {
+  if (!userId) return resources;
+  
+  try {
+    console.log("Checking downloaded resources for user:", userId);
+    
+    const { data: transactions } = await supabase
+      .from("transactions")
+      .select("resource_id")
+      .eq("buyer_id", userId);
+
+    const downloadedIds = new Set(transactions?.map(t => t.resource_id) || []);
+
+    return resources.map(resource => ({
+      ...resource,
+      isDownloaded: downloadedIds.has(resource.id)
+    }));
+  } catch (error) {
+    console.error("Error checking downloaded resources:", error);
+    return resources;
+  }
+};
+
+// Fetch trending tags
 export const fetchTrendingTags = async () => {
   try {
     console.log("Fetching trending tags...");
@@ -31,66 +96,10 @@ export const fetchTrendingTags = async () => {
       console.log("Trending tags fetched:", sortedTags);
       return sortedTags;
     }
+    
     return [];
   } catch (error) {
     console.error("Error fetching trending tags:", error);
-    return [];
-  }
-};
-
-// Fetch resources with filters and search
-export const fetchExploreResources = async (userId, searchQuery, filters) => {
-  try {
-    console.log("Fetching explore resources with filters:", filters);
-    
-    let query = supabase.from("resources").select("*");
-
-    if (searchQuery) {
-      // Enhanced search: title, description, and tags
-      const searchTerm = searchQuery.toLowerCase();
-      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,tags.cs.{${searchTerm}}`);
-    }
-
-    if (filters.departmentFilter !== "all") {
-      query = query.eq("department", filters.departmentFilter);
-    }
-
-    if (filters.levelFilter !== "all") {
-      query = query.eq("level", filters.levelFilter);
-    }
-
-    if (filters.priceFilter === "free") {
-      query = query.eq("price", 0);
-    } else if (filters.priceFilter === "paid") {
-      query = query.gt("price", 0);
-    }
-
-    if (filters.verifiedFilter === "verified") {
-      query = query.eq("verified", true);
-    }
-
-    const { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    if (data && userId) {
-      // Check if user has downloaded any resources
-      const resourceIds = data.map(r => r.id);
-      const downloadedIds = await checkUserDownloads(userId, resourceIds);
-      
-      const resourcesWithDownloadStatus = data.map(resource => ({
-        ...resource,
-        isDownloaded: downloadedIds.has(resource.id)
-      }));
-
-      console.log("Explore resources fetched:", resourcesWithDownloadStatus.length);
-      return resourcesWithDownloadStatus;
-    }
-
-    console.log("Explore resources fetched:", data?.length || 0);
-    return data || [];
-  } catch (error) {
-    console.error("Error fetching explore resources:", error);
     return [];
   }
 };

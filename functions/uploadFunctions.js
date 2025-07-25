@@ -1,25 +1,24 @@
 
 import { supabase } from "@/lib/supabase";
 import { getUserTier, getTierInfo, canUserUpload, getPriceSuggestions } from "@/lib/tier-system";
-import { validateFile } from "./utils.js";
 
-// Fetch user tier and upload info
-export const fetchUserTierInfo = async (userId) => {
+// Fetch user tier information for upload limits
+export const fetchUserTierForUpload = async (userId) => {
   try {
-    console.log("Fetching user tier info for uploads:", userId);
+    console.log("Fetching user tier for upload:", userId);
     
     const tier = await getUserTier(userId);
     const tierInfo = getTierInfo(tier);
     
-    console.log("User tier fetched:", tier, tierInfo.name);
+    console.log("User tier info:", tierInfo);
     return { tier, tierInfo };
   } catch (error) {
-    console.error("Error fetching user tier info:", error);
+    console.error("Error fetching user tier:", error);
     return { tier: 1, tierInfo: getTierInfo(1) };
   }
 };
 
-// Fetch user upload count
+// Check user's current upload count
 export const fetchUserUploadCount = async (userId) => {
   try {
     console.log("Fetching user upload count:", userId);
@@ -40,14 +39,49 @@ export const fetchUserUploadCount = async (userId) => {
   }
 };
 
-// Generate preview image for files
-export const generatePreviewImage = async (file) => {
+// Validate file before upload
+export const validateUploadFile = (file, maxSize = 10 * 1024 * 1024) => {
+  console.log("Validating file:", file?.name);
+  
+  if (!file) return { valid: false, error: "No file selected" };
+  
+  if (file.size > maxSize) {
+    return { 
+      valid: false, 
+      error: `File too large. Maximum size is ${formatFileSize(maxSize)}` 
+    };
+  }
+  
+  const allowedTypes = [
+    "application/pdf", 
+    "application/msword", 
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "image/jpeg", 
+    "image/png", 
+    "image/jpg"
+  ];
+  
+  if (!allowedTypes.includes(file.type)) {
+    return { 
+      valid: false, 
+      error: "Invalid file type. Please upload PDF, DOC, PPT, or image files." 
+    };
+  }
+  
+  console.log("File validation passed");
+  return { valid: true };
+};
+
+// Generate preview image for uploaded file
+export const generateFilePreview = async (file) => {
   if (typeof window === "undefined") return null;
   
-  console.log("Generating preview for file:", file.name, file.type);
+  console.log("Generating preview for:", file.type);
   
-  try {
-    if (file.type === "application/pdf") {
+  if (file.type === "application/pdf") {
+    try {
       const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -78,9 +112,14 @@ export const generatePreviewImage = async (file) => {
         canvas.toBlob(resolve, "image/jpeg", 0.7),
       );
       
-      console.log("PDF preview generated successfully");
+      console.log("PDF preview generated");
       return blob;
-    } else if (file.type.startsWith("image/")) {
+    } catch (error) {
+      console.error("Error generating PDF preview:", error);
+      return null;
+    }
+  } else if (file.type.startsWith("image/")) {
+    try {
       const img = new window.Image();
       const fileUrl = URL.createObjectURL(file);
       await new Promise((resolve) => {
@@ -106,15 +145,70 @@ export const generatePreviewImage = async (file) => {
         canvas.toBlob(resolve, "image/jpeg", 0.5),
       );
       
-      console.log("Image preview generated successfully");
+      console.log("Image preview generated");
       return blob;
+    } catch (error) {
+      console.error("Error generating image preview:", error);
+      return null;
     }
+  }
+  return null;
+};
+
+// Upload file to storage
+export const uploadFileToStorage = async (file, filePath) => {
+  try {
+    console.log("Uploading file to storage:", filePath);
     
-    console.log("No preview needed for file type:", file.type);
-    return null;
+    const { error } = await supabase.storage
+      .from("resources")
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    console.log("File uploaded successfully");
+    return { success: true };
   } catch (error) {
-    console.error("Error generating preview:", error);
-    return null;
+    console.error("Error uploading file:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Upload preview to storage
+export const uploadPreviewToStorage = async (previewBlob, previewPath) => {
+  try {
+    console.log("Uploading preview to storage:", previewPath);
+    
+    const { error } = await supabase.storage
+      .from("previews")
+      .upload(previewPath, previewBlob);
+
+    if (error) throw error;
+
+    console.log("Preview uploaded successfully");
+    return { success: true };
+  } catch (error) {
+    console.error("Error uploading preview:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Save resource metadata to database
+export const saveResourceMetadata = async (resourceData) => {
+  try {
+    console.log("Saving resource metadata:", resourceData.title);
+    
+    const { error } = await supabase
+      .from("resources")
+      .insert(resourceData);
+
+    if (error) throw error;
+
+    console.log("Resource metadata saved successfully");
+    return { success: true };
+  } catch (error) {
+    console.error("Error saving resource metadata:", error);
+    return { success: false, error: error.message };
   }
 };
 
@@ -130,82 +224,23 @@ const cropCanvas = (canvas, x, y, width, height) => {
   canvas.getContext("2d").drawImage(cropped, 0, 0);
 };
 
-// Upload resource with all metadata
-export const uploadResource = async (userId, resourceData, file, previewBlob) => {
-  try {
-    console.log("Starting resource upload:", resourceData.title);
-    
-    // Validate file
-    const validation = validateFile(file);
-    if (!validation.valid) {
-      throw new Error(validation.error);
-    }
-
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `resources/${fileName}`;
-
-    let previewPath = null;
-
-    // Upload preview if available
-    if (previewBlob) {
-      const previewFileName = `preview_${Date.now()}.jpg`;
-      previewPath = `previews/${previewFileName}`;
-
-      console.log("Uploading preview image...");
-      const { error: previewUploadError } = await supabase.storage
-        .from("previews")
-        .upload(previewPath, previewBlob);
-      
-      if (previewUploadError) throw previewUploadError;
-    }
-
-    // Upload original file
-    console.log("Uploading original file...");
-    const { error: uploadError } = await supabase.storage
-      .from("resources")
-      .upload(filePath, file);
-    
-    if (uploadError) throw uploadError;
-
-    // Save metadata to database
-    console.log("Saving resource metadata...");
-    const { data, error: dbError } = await supabase.from("resources").insert({
-      title: resourceData.title,
-      description: resourceData.description,
-      uploader_id: userId,
-      department: resourceData.department,
-      level: resourceData.level,
-      price: Number.parseFloat(resourceData.price) || 0,
-      tags: resourceData.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      storage_path: filePath,
-      file_type: file.type,
-      preview_path: previewBlob ? previewPath : null,
-    });
-
-    if (dbError) throw dbError;
-
-    console.log("Resource uploaded successfully:", data);
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error uploading resource:", error);
-    throw error;
-  }
-};
-
-// Check if user can upload more resources
-export const checkUploadPermissions = (uploadCount, userTier) => {
-  const canUpload = canUserUpload(uploadCount, userTier);
-  console.log("Upload permissions check:", { uploadCount, userTier, canUpload });
-  return canUpload;
+// Helper function to format file size
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (
+    Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  );
 };
 
 // Get price suggestions for user tier
-export const getTierPriceSuggestions = (userTier) => {
-  const suggestions = getPriceSuggestions(userTier);
-  console.log("Price suggestions for tier", userTier, ":", suggestions);
-  return suggestions;
+export const getUserPriceSuggestions = (userTier) => {
+  return getPriceSuggestions(userTier);
+};
+
+// Check if user can upload more resources
+export const checkUserCanUpload = (uploadCount, userTier) => {
+  return canUserUpload(uploadCount, userTier);
 };
