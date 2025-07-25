@@ -481,9 +481,9 @@ export default function ResourceDetailScreen({
             <CardContent className="p-8 text-center">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-600 uppercase tracking-wide font-semibold">
+                  {/* <p className="text-sm text-gray-600 uppercase tracking-wide font-semibold">
                     {resource.price === 0 ? "Completely Free! 🎉" : "Price"}
-                  </p>
+                  </p> */}
                   <div className="text-5xl font-black text-gray-900">
                     {resource.price === 0 ? (
                       <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
@@ -543,71 +543,13 @@ export default function ResourceDetailScreen({
         )}
 
         {/* File Preview Section */}
-        <FilePreview 
+        {/* <FilePreview 
           resource={resource}
           onDownload={handleDownload}
           canPreview={hasAccess}
-        />
+        /> */}
 
-        {/* Resource Details Card */}
-        <Card className="rounded-2xl shadow-sm bg-white border border-gray-200">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">About this resource</h3>
-                {resource.description ? (
-                  <p className="text-gray-600 leading-relaxed">{resource.description}</p>
-                ) : (
-                  <p className="text-gray-500 italic">No description provided</p>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">File Type</p>
-                  <p className="font-medium text-gray-900">{resource.file_type}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">Downloads</p>
-                  <p className="font-medium text-gray-900">{stats.downloadCount}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-lg rounded-2xl">
-            <CardContent className="p-4 text-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-bold text-gray-900 text-sm mb-1">Verified</h3>
-              <p className="text-gray-600 text-xs">Safe & Secure ✅</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-lg rounded-2xl">
-            <CardContent className="p-4 text-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-400 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <Clock className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-bold text-gray-900 text-sm mb-1">Instant</h3>
-              <p className="text-gray-600 text-xs">Download Now 📥</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-lg rounded-2xl">
-            <CardContent className="p-4 text-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-xl flex items-center justify-center mx-auto mb-2">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="font-bold text-gray-900 text-sm mb-1">Popular</h3>
-              <p className="text-gray-600 text-xs">{stats.downloadCount} downloads</p>
-            </CardContent>
-          </Card>
-        </div>
+ 
 
         {/* Upload Info */}
         <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-lg rounded-2xl">
