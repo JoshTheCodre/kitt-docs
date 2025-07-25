@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -65,7 +64,7 @@ export default function ResourceDetailScreen({
 
   useEffect(() => {
     if (!user?.id || !resource?.id) return;
-    
+
     console.log("Initializing resource detail screen for:", resource.title);
     initializeData();
   }, [user?.id, resource?.id]);
@@ -110,7 +109,7 @@ export default function ResourceDetailScreen({
         .select("balance")
         .eq("user_id", user.id)
         .single();
-      
+
       console.log("User wallet balance:", data?.balance || 0);
       return data;
     } catch (error) {
@@ -122,7 +121,7 @@ export default function ResourceDetailScreen({
   const fetchOwnerStats = async () => {
     try {
       const { supabase } = await import("@/lib/supabase");
-      
+
       // Fetch transactions for earnings
       const { data: transactions } = await supabase
         .from("transactions")
@@ -145,7 +144,7 @@ export default function ResourceDetailScreen({
 
       const totalEarnings = transactions?.reduce((sum, t) => sum + t.amount * 0.9, 0) || 0;
       const totalPurchases = transactions?.length || 0;
-      
+
       setOwnerStats({
         totalEarnings,
         totalPurchases,
@@ -173,7 +172,7 @@ export default function ResourceDetailScreen({
     setLoading(true);
     try {
       console.log("Starting download for resource:", resource.id);
-      
+
       // Record download in database
       await downloadResource(user.id, resource.id);
 
@@ -221,7 +220,7 @@ export default function ResourceDetailScreen({
     setLoading(true);
     try {
       console.log("Processing purchase for resource:", resource.id, "Amount:", resource.price);
-      
+
       await purchaseResource(user.id, resource.id, resource.price);
 
       // Update local state
@@ -248,11 +247,11 @@ export default function ResourceDetailScreen({
   const handleToggleFavorite = async () => {
     try {
       console.log("Toggling favorite status for resource:", resource.id);
-      
+
       const result = await toggleFavorite(user.id, resource.id, permissions.isFavorited);
-      
+
       setPermissions(prev => ({ ...prev, isFavorited: result.isFavorited }));
-      
+
       toast({
         title: result.isFavorited ? "Added to favorites! 💖" : "Removed from favorites 💔",
         description: result.isFavorited ? "Added to your collection!" : "No longer in your favs!",
@@ -272,7 +271,7 @@ export default function ResourceDetailScreen({
   const handleShare = async () => {
     try {
       console.log("Sharing resource:", resource.id);
-      
+
       const shareUrl = `${window.location.origin}/resource/${resource.id}`;
 
       if (navigator.share) {
@@ -480,10 +479,8 @@ export default function ResourceDetailScreen({
           <Card className="bg-gradient-to-br from-white to-purple-50 border-0 shadow-xl rounded-3xl overflow-hidden">
             <CardContent className="p-8 text-center">
               <div className="space-y-6">
+                
                 <div className="space-y-2">
-                  {/* <p className="text-sm text-gray-600 uppercase tracking-wide font-semibold">
-                    {resource.price === 0 ? "Completely Free! 🎉" : "Price"}
-                  </p> */}
                   <div className="text-5xl font-black text-gray-900">
                     {resource.price === 0 ? (
                       <span className="bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
@@ -549,7 +546,7 @@ export default function ResourceDetailScreen({
           canPreview={hasAccess}
         /> */}
 
- 
+
 
         {/* Upload Info */}
         <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-lg rounded-2xl">
