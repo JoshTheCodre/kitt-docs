@@ -9,7 +9,10 @@ import {
   UploadIcon,
   Award,
 } from "lucide-react";
-import { fetchUserProfile, fetchForYouResources } from "@/functions/homeFunctions";
+import {
+  fetchUserProfile,
+  fetchForYouResources,
+} from "@/functions/homeFunctions";
 import { getGreeting } from "@/functions/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,7 +119,7 @@ export default function HomeScreen({ user, onNavigate }) {
                   className="bg-white text-purple-600 hover:bg-gray-100 font-bold py-3 px-8 rounded-2xl text-lg shadow-lg transform hover:scale-105 transition-all duration-300"
                   onClick={() => onNavigate("explore")}
                 >
-                  Discover Now 
+                  Discover Now
                 </Button>
               </CardContent>
             </Card>
