@@ -57,6 +57,16 @@ export default function AuthCallback() {
                 window.location.href = "/?error=profile_creation_failed";
                 return;
               }
+
+              // Create wallet for the new user
+              const { error: walletError } = await supabase
+                .from("wallets")
+                .insert({ user_id: user.id, balance: 0.0 });
+
+              if (walletError) {
+                console.error("Error creating wallet:", walletError);
+                // Don't redirect on wallet error, user profile exists
+              }
             }
           }
 

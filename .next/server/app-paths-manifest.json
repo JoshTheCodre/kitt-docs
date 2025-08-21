@@ -1,8 +1,14 @@
 {
-  "/page": "app/page.js",
-  "/home/page": "app/home/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/auth/callback/page": "app/auth/callback/page.js",
   "/explore/page": "app/explore/page.js",
-  "/wallet/page": "app/wallet/page.js",
+  "/home/page": "app/home/page.js",
   "/library/page": "app/library/page.js",
-  "/upload/page": "app/upload/page.js"
+  "/manifest.json/route": "app/manifest.json/route.js",
+  "/profile/page": "app/profile/page.js",
+  "/upload/page": "app/upload/page.js",
+  "/page": "app/page.js",
+  "/resource/[id]/page": "app/resource/[id]/page.js",
+  "/wallet/page": "app/wallet/page.js"
 }

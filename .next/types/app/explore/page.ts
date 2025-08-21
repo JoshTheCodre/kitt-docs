@@ -1,4 +1,4 @@
-// File: /home/runner/workspace/app/explore/page.tsx
+// File: /home/runner/work/kitt-docs/kitt-docs/app/explore/page.tsx
 import * as entry from '../../../../app/explore/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
