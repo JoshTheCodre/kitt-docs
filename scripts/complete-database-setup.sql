@@ -230,10 +230,12 @@ ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
 -- Users can view and update their own profile
 CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Users can view and update their own wallet
 CREATE POLICY "Users can view own wallet" ON public.wallets FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update own wallet" ON public.wallets FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own wallet" ON public.wallets FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Resources are publicly viewable but only owners can update
 CREATE POLICY "Resources are publicly viewable" ON public.resources FOR SELECT USING (true);
